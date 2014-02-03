@@ -29,6 +29,12 @@ class Response(object):
     def __str__(self):
         return '%s - %s' % (self.__class__.__name__, self.data)
 
+    def __eq__(self, other):
+        return (
+            (self.frame_type == other.frame_type) and
+            (self.connection == other.connection) and
+            (self.data == other.data))
+
 
 class Message(Response):
     '''A message'''
