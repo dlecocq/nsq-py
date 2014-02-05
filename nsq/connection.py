@@ -1,6 +1,7 @@
 from . import constants
 from . import logger
 from . import response
+from . import util
 
 try:
     import simplejson as json
@@ -84,6 +85,7 @@ class Connection(object):
         if self._pending:
             # Try to send as much of the first message as possible
             count = self._socket.send(self._pending[0])
+            print 'Sent %s' % count
             if count < len(self._pending[0]):
                 # Save the rest of the message that could not be sent
                 self._pending[0] = self._pending[0][count:]
@@ -95,7 +97,10 @@ class Connection(object):
 
     def send(self, command, message=None):
         '''Send a command over the socket with length endcoded'''
-        joined = command + constants.NL + (message or '')
+        if message:
+            joined = command + constants.NL + util.pack(message)
+        else:
+            joined = command + constants.NL
         if self._blocking:
             self._socket.sendall(joined)
         else:
