@@ -1,7 +1,6 @@
 from . import constants
 from . import logger
 from . import response
-from . import util
 
 try:
     import simplejson as json
@@ -25,6 +24,8 @@ class Connection(object):
         # Our host and port
         self.host = host
         self.port = port
+        # Whether or not our socket is set to block
+        self._blocking = 1
 
     def close(self):
         '''Close our connection'''
@@ -58,16 +59,45 @@ class Connection(object):
                 break
         return responses
 
+    def setblocking(self, blocking):
+        '''Set whether or not this message is blocking'''
+        self._socket.setbocking(blocking)
+        self._blocking = blocking
+
     def fileno(self):
         '''Returns the socket's fileno. This allows us to select on this'''
         return self._socket.fileno()
 
+    def pending(self):
+        '''All of the messages waiting to be sent'''
+        return self._pending
+
+    def flush(self):
+        '''Flush some of the waiting messages, returns count written'''
+        # We can only send at most one message here, because all we know is
+        # that the socket can have some data written to it. We don't know how
+        # many messages-worth might be sent. An alternative would be to keep
+        # around a single string of the data that remains to be sent so that we
+        # could potentially send larger messages
+        if self._pending:
+            # Try to send as much of the first message as possible
+            count = self._socket.send(self._pending[0])
+            if count < len(self._pending[0]):
+                # Save the rest of the message that could not be sent
+                self._pending[0] = self._pending[0][count:]
+            else:
+                # Otherwise, pop off this message
+                self._pending.pop(0)
+            return count
+        return 0
+
     def send(self, command, message=None):
         '''Send a command over the socket with length endcoded'''
-        if message:
-            self._socket.send(command + constants.NL + util.pack(message))
+        joined = command + constants.NL + (message or '')
+        if self._blocking:
+            self._socket.sendall(joined)
         else:
-            self._socket.send(command + constants.NL)
+            self._pending.append(joined)
 
     def identify(self, data):
         '''Send an identification message'''

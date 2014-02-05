@@ -9,6 +9,7 @@ from . import logger
 from . import connection
 
 import requests
+import select
 import time
 
 
@@ -48,3 +49,39 @@ class Client(object):
 
         # And return all the new connections
         return [self._connections[key] for key in new]
+
+    def remove(self, connection):
+        '''Remove a connection'''
+        key = (connection.host, connection.port)
+        found = self._connections.delete(key, None)
+        try:
+            found.close()
+        except Exception as exc:
+            logger.warn('Failed to close %s: %s' % (connection, exc))
+        return found
+
+    def read(self):
+        '''Read from any of the connections that need it'''
+        connections = self._connections.values()
+
+        # Not all connections need to be written to, so we'll only concern
+        # ourselves with those that require writes
+        writes = [c for c in connections if c.pending()]
+        readable, writable, exceptions = select.select(
+            connections, writes, connections)
+
+        responses = []
+        # For each readable socket, we'll try to read some responses
+        for conn in readable:
+            responses.extend(conn.read())
+
+        # For each writable socket, flush some data out
+        for conn in writable:
+            conn.flush()
+
+        # For each connection with an exception, try to close it and remove it
+        # from our connections
+        for conn in exceptions:
+            self.remove(conn)
+
+        return responses
