@@ -7,19 +7,18 @@ except ImportError:
 
 from . import logger
 from . import connection
+from .response import Response, Message
+from .constants import HEARTBEAT
 
 import requests
 import select
-import time
 
 
 class Client(object):
     '''A client for talking to NSQ over a connection'''
-    def __init__(self, topic, lookupd):
+    def __init__(self, lookupd):
         self._connections = {}
         self._lookupd = lookupd
-        self._topic = topic
-        self._last_discovery = 0
 
     def discover(self):
         '''Run the discovery mechanism'''
@@ -43,9 +42,6 @@ class Client(object):
         for key in old:
             logger.info('Closing disappeared %s:%s' % key)
             self._connections.delete(key).close()
-
-        # Reset the time since the last discovery
-        self._last_discovery = time.time()
 
         # And return all the new connections
         return [self._connections[key] for key in new]
@@ -73,7 +69,12 @@ class Client(object):
         responses = []
         # For each readable socket, we'll try to read some responses
         for conn in readable:
-            responses.extend(conn.read())
+            for res in conn.read():
+                # We'll capture heartbeats and respond to them automatically
+                if (isinstance(res, Response) and res.data == HEARTBEAT):
+                    conn.nop()
+                    continue
+                responses.append(res)
 
         # For each writable socket, flush some data out
         for conn in writable:
@@ -85,3 +86,25 @@ class Client(object):
             self.remove(conn)
 
         return responses
+
+
+class Reader(Client):
+    '''A client meant exclusively for reading'''
+    def __init__(self, topic, channel, lookupd):
+        self._topic = topic
+        self._channel = channel
+        Client.__init__(self, lookupd)
+
+    def discover(self):
+        for connection in Client.discover(self):
+            connection.setblocking(0)
+            connection.sub(self._topic, self._channel)
+            # This is just a place holder until the real rdy logic is in place
+            connection.rdy(10)
+
+    def __iter__(self):
+        while True:
+            for message in self.read():
+                # A reader's only interested in actual messages
+                if isinstance(message, Message):
+                    yield message
