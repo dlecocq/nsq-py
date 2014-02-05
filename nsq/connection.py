@@ -26,6 +26,8 @@ class Connection(object):
         self.port = port
         # Whether or not our socket is set to block
         self._blocking = 1
+        # The pending messages we have to send
+        self._pending = []
 
     def close(self):
         '''Close our connection'''
@@ -61,7 +63,7 @@ class Connection(object):
 
     def setblocking(self, blocking):
         '''Set whether or not this message is blocking'''
-        self._socket.setbocking(blocking)
+        self._socket.setblocking(blocking)
         self._blocking = blocking
 
     def fileno(self):
