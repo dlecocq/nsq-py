@@ -45,50 +45,50 @@ class TestConnection(unittest.TestCase):
 
     def test_blocking(self):
         '''Sets blocking on the socket'''
-        self.connection._socket = mock.Mock()
-        self.connection.setblocking(0)
-        self.connection._socket.setblocking.assert_called_with(0)
+        with mock.patch.object(self.connection, '_socket', mock.Mock()):
+            self.connection.setblocking(0)
+            self.connection._socket.setblocking.assert_called_with(0)
 
     def test_pending(self):
         '''Appends to pending'''
-        self.connection._socket = mock.Mock()
-        self.connection.setblocking(0)
-        self.connection.nop()
-        self.assertEqual(self.connection.pending(),
-            [constants.NOP + constants.NL])
+        with mock.patch.object(self.connection, '_socket', mock.Mock()):
+            self.connection.setblocking(0)
+            self.connection.nop()
+            self.assertEqual(self.connection.pending(),
+                [constants.NOP + constants.NL])
 
     def test_flush_partial(self):
         '''Keeps its place when flushing out partial messages'''
         # We'll tell the connection it has only sent one byte when flushing
-        self.connection._socket.send = mock.Mock()
-        self.connection._socket.send.return_value = 1
-        self.connection.setblocking(0)
-        self.connection.nop()
-        self.connection.flush()
-        # We expect all but the first byte to remain
-        message = constants.NOP + constants.NL
-        self.assertEqual(self.connection.pending(), [message[1:]])
+        with mock.patch.object(self.connection._socket, 'send', mock.Mock()):
+            self.connection._socket.send.return_value = 1
+            self.connection.setblocking(0)
+            self.connection.nop()
+            self.connection.flush()
+            # We expect all but the first byte to remain
+            message = constants.NOP + constants.NL
+            self.assertEqual(self.connection.pending(), [message[1:]])
 
     def test_flush_full(self):
         '''Pops off messages it has flushed completely'''
         message = constants.NOP + constants.NL
         # We'll tell the connection it has only sent one byte when flushing
-        self.connection._socket.send = mock.Mock()
-        self.connection._socket.send.return_value = len(message)
-        self.connection.setblocking(0)
-        self.connection.nop()
-        self.connection.flush()
-        # The nop message was sent, so we expect it to be popped
-        self.assertEqual(self.connection.pending(), [])
+        with mock.patch.object(self.connection._socket, 'send', mock.Mock()):
+            self.connection._socket.send.return_value = len(message)
+            self.connection.setblocking(0)
+            self.connection.nop()
+            self.connection.flush()
+            # The nop message was sent, so we expect it to be popped
+            self.assertEqual(self.connection.pending(), [])
 
     def test_flush_count(self):
         '''Returns how many bytes were sent'''
         message = constants.NOP + constants.NL
-        self.connection._socket.send = mock.Mock()
-        self.connection._socket.send.return_value = len(message)
-        self.connection.setblocking(0)
-        self.connection.nop()
-        self.assertEqual(self.connection.flush(), len(message))
+        with mock.patch.object(self.connection._socket, 'send', mock.Mock()):
+            self.connection._socket.send.return_value = len(message)
+            self.connection.setblocking(0)
+            self.connection.nop()
+            self.assertEqual(self.connection.flush(), len(message))
 
     def test_flush_empty(self):
         '''Returns 0 if there are no pending messages'''
