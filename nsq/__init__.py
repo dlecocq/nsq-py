@@ -8,3 +8,9 @@ formatter = logging.Formatter('[%(levelname)s] %(message)s')
 handler.setFormatter(formatter)
 logger.addHandler(handler)
 logger.setLevel(logging.ERROR)
+
+# Our underlying json implmentation
+try:
+    import simplejson as json
+except ImportError:  # pragma: no cover
+    import json
