@@ -43,6 +43,15 @@ class TestConnection(unittest.TestCase):
                 return found
         return found
 
+    def test_alive(self):
+        '''Alive should return True if connected'''
+        self.assertTrue(self.connection.alive())
+
+    def test_close(self):
+        '''Should mark the connection as closed'''
+        self.connection.close()
+        self.assertFalse(self.connection.alive())
+
     def test_blocking(self):
         '''Sets blocking on the socket'''
         with mock.patch.object(self.connection, '_socket', mock.Mock()):

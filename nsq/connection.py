@@ -2,11 +2,7 @@ from . import constants
 from . import logger
 from . import response
 from . import util
-
-try:
-    import simplejson as json
-except ImportError:  # pragma: no cover
-    import json
+from . import json
 
 import socket
 import struct
@@ -14,13 +10,10 @@ import struct
 
 class Connection(object):
     '''A socket-based connection to a NSQ server'''
-    def __init__(self, host, port, timeout=5.0):
+    def __init__(self, host, port, timeout=1.0):
         assert isinstance(host, (str, unicode))
         assert isinstance(port, int)
-        self._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self._socket.settimeout(timeout)
-        self._socket.connect((host, port))
-        self._socket.send(constants.MAGIC_V2)
+        self._socket = None
         self._buffer = ''
         # Our host and port
         self.host = host
@@ -29,10 +22,24 @@ class Connection(object):
         self._blocking = 1
         # The pending messages we have to send
         self._pending = []
+        self._timeout = timeout
+        # Establish our connection
+        self.connect()
+
+    def connect(self):
+        '''Establish a connection'''
+        self._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self._socket.settimeout(self._timeout)
+        self._socket.connect((self.host, self.port))
+        self._socket.send(constants.MAGIC_V2)
 
     def close(self):
         '''Close our connection'''
-        self._socket.close()
+        try:
+            if self._socket:
+                self._socket.close()
+        finally:
+            self._socket = None
 
     def read(self):
         '''Read from the socket, and return a list of responses'''
@@ -61,6 +68,10 @@ class Connection(object):
             else:
                 break
         return responses
+
+    def alive(self):
+        '''Returns True if this connection is alive'''
+        return bool(self._socket)
 
     def setblocking(self, blocking):
         '''Set whether or not this message is blocking'''
