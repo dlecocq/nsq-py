@@ -26,6 +26,11 @@ class Connection(object):
         # Establish our connection
         self.connect()
 
+    def __str__(self):
+        state = 'alive' if self.alive() else 'dead'
+        return '<Connection %s:%s (%s on FD %s)>' % (
+            self.host, self.port, state, self.fileno())
+
     def connect(self):
         '''Establish a connection'''
         self._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
