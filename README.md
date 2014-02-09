@@ -1,5 +1,7 @@
 NSQ for Python
 ==============
+[![Build Status](https://travis-ci.org/dlecocq/nsq-py.png)](https://travis-ci.org/dlecocq/nsq-py)
+
 It seems that under the hood, there should be just a few primitives at the
 lowest level:
 
