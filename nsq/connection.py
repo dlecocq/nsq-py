@@ -32,6 +32,8 @@ class Connection(object):
         self._socket.settimeout(self._timeout)
         self._socket.connect((self.host, self.port))
         self._socket.send(constants.MAGIC_V2)
+        # I'm not quite sure why this breaks tests, but it seems right
+        # self._socket.setblocking(self._blocking)
 
     def close(self):
         '''Close our connection'''
@@ -96,7 +98,6 @@ class Connection(object):
         if self._pending:
             # Try to send as much of the first message as possible
             count = self._socket.send(self._pending[0])
-            print 'Sent %s' % count
             if count < len(self._pending[0]):
                 # Save the rest of the message that could not be sent
                 self._pending[0] = self._pending[0][count:]

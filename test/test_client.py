@@ -3,6 +3,8 @@ import unittest
 
 from nsq import client
 from nsq import response
+from nsq import constants
+from nsq import exceptions
 from nsq.clients import ClientException
 
 from common import FakeServer
@@ -33,6 +35,53 @@ class TestClient(unittest.TestCase):
         for res in found:
             self.assertIsInstance(res, response.Response)
             self.assertEqual(res.data, 'hello')
+
+    def test_heartbeat(self):
+        '''Sends a nop on connections that have received a heartbeat'''
+        self.server1.send(response.Response.pack(constants.HEARTBEAT))
+        # We have to go through two rounds of read -- one to get the message
+        # and one to flush the nop message out
+        self.assertEqual(self.client.read(), [])
+        self.assertEqual(self.client.read(), [])
+        # We should have received a `NOP` on that connection
+        self.assertEqual(self.server1.read(100),
+            constants.MAGIC_V2 + constants.NOP + constants.NL)
+
+    def test_closes_on_fatal(self):
+        '''All but a few errors are considered fatal'''
+        self.server1.send(response.Error.pack(exceptions.InvalidException.name))
+        self.client.read()
+        states = set(conn.alive() for conn in self.client.connections())
+        self.assertEqual(states, set((True, False)))
+
+    def test_nonfatal(self):
+        '''Nonfatal errors keep the connection open'''
+        message = response.Error.pack(exceptions.FinFailedException.name)
+        self.server1.send(message)
+        self.client.read()
+        states = set(conn.alive() for conn in self.client.connections())
+        self.assertEqual(states, set((True,)))
+
+    def test_passes_errors(self):
+        '''The client's read method should now swallow Error responses'''
+        message = response.Error.pack(exceptions.InvalidException.name)
+        self.server1.send(message)
+        res = self.client.read()
+        self.assertEqual(len(res), 1)
+        self.assertIsInstance(res[0], response.Error)
+        self.assertEqual(res[0].data, exceptions.InvalidException.name)
+
+    def test_closes_on_exception(self):
+        '''If a connection gets an exception, it closes it'''
+        # Pick a connection to have throw an exception
+        connection = self.client.connections()[0]
+        message = response.Response.pack('hello')
+        with mock.patch.object(
+            connection, 'read', side_effect=exceptions.NSQException):
+            self.server1.send(message)
+            self.server2.send(message)
+            self.client.read()
+            self.assertFalse(connection.alive())
 
 
 class TestClientNsqd(unittest.TestCase):
@@ -114,6 +163,22 @@ class TestClientLookupd(unittest.TestCase):
             self.client = client.Client(
                 lookupd_http_addresses=['http://localhost:1234'],
                 topic='foo')
+
+    def test_discover_connected(self):
+        '''Doesn't freak out when rediscovering established connections'''
+        before = self.client.connections()
+        self.client.discover('foo')
+        self.assertEqual(self.client.connections(), before)
+
+    def test_discover_closed(self):
+        '''Reconnects to discovered servers that have closed connections'''
+        for conn in self.client.connections():
+            conn.close()
+        state = [conn.alive() for conn in self.client.connections()]
+        self.assertEqual(state, [False])
+        self.client.discover('foo')
+        state = [conn.alive() for conn in self.client.connections()]
+        self.assertEqual(state, [True])
 
 
 class TestReader(unittest.TestCase):

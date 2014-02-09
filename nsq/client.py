@@ -2,8 +2,9 @@
 
 from . import connection
 from . import logger
-from .response import Response, Message
+from . import exceptions
 from .constants import HEARTBEAT
+from .response import Response, Message, Error
 from .clients import nsqlookupd, ClientException
 
 import select
@@ -108,10 +109,14 @@ class Client(object):
         with self._lock:
             found = self._connections.pop(key, None)
         try:
-            found.close()
+            self.close_connection(found)
         except Exception as exc:
             logger.warn('Failed to close %s: %s' % (connection, exc))
         return found
+
+    def close_connection(self, connection):
+        '''A hook for subclasses when connections are closed'''
+        connection.close()
 
     def close(self):
         '''Close this client down'''
@@ -125,18 +130,34 @@ class Client(object):
         # Not all connections need to be written to, so we'll only concern
         # ourselves with those that require writes
         writes = [c for c in connections if c.pending()]
-        readable, writable, exceptions = select.select(
+        readable, writable, exceptable = select.select(
             connections, writes, connections)
 
         responses = []
         # For each readable socket, we'll try to read some responses
         for conn in readable:
-            for res in conn.read():
-                # We'll capture heartbeats and respond to them automatically
-                if (isinstance(res, Response) and res.data == HEARTBEAT):
-                    conn.nop()
-                    continue
-                responses.append(res)
+            try:
+                for res in conn.read():
+                    # We'll capture heartbeats and respond to them automatically
+                    if (isinstance(res, Response) and res.data == HEARTBEAT):
+                        conn.nop()
+                        continue
+                    elif isinstance(res, Error):
+                        nonfatal = (
+                            exceptions.FinFailedException,
+                            exceptions.ReqFailedException,
+                            exceptions.TouchFailedException
+                        )
+                        if not isinstance(res.exception(), nonfatal):
+                            # If it's not any of the non-fatal exceptions, then
+                            # we have to close this connection
+                            logger.error(
+                                'Closing %s: %s' % (conn, res.exception()))
+                            self.close_connection(conn)
+                    responses.append(res)
+            except exceptions.NSQException:
+                logger.exception('Failed to read from %s' % conn)
+                self.close_connection(conn)
 
         # For each writable socket, flush some data out
         for conn in writable:
@@ -144,29 +165,7 @@ class Client(object):
 
         # For each connection with an exception, try to close it and remove it
         # from our connections
-        for conn in exceptions:
-            conn.close()
+        for conn in exceptable:
+            self.close_connection(conn)
 
         return responses
-
-
-class Reader(Client):
-    '''A client meant exclusively for reading'''
-    def __init__(self, topic, channel, lookupd_http_addresses):
-        self._channel = channel
-        Client.__init__(self,
-            lookupd_http_addresses=lookupd_http_addresses, topic=topic)
-
-    def discover(self):
-        for connection in Client.discover(self):
-            connection.setblocking(0)
-            connection.sub(self._topic, self._channel)
-            # This is just a place holder until the real rdy logic is in place
-            connection.rdy(10)
-
-    def __iter__(self):
-        while True:
-            for message in self.read():
-                # A reader's only interested in actual messages
-                if isinstance(message, Message):
-                    yield message
