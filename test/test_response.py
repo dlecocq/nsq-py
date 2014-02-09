@@ -28,6 +28,13 @@ class TestResponse(unittest.TestCase):
         res = response.Response.from_raw(None, raw)
         self.assertEqual(str(res), 'Response - hello')
 
+    def test_pack(self):
+        '''Can pack itself up'''
+        packed = response.Response.pack('hello')[4:]
+        unpacked = response.Response.from_raw(None, packed)
+        self.assertIsInstance(unpacked, response.Response)
+        self.assertEqual(unpacked.data, 'hello')
+
 
 class TestError(unittest.TestCase):
     '''Test our error response class'''
@@ -72,6 +79,13 @@ class TestError(unittest.TestCase):
         exc = res.exception()
         self.assertIsInstance(exc, exceptions.InvalidException)
         self.assertEqual(exc.message, 'foo')
+
+    def test_pack(self):
+        '''Can pack itself up'''
+        packed = response.Error.pack('hello')[4:]
+        unpacked = response.Response.from_raw(None, packed)
+        self.assertIsInstance(unpacked, response.Error)
+        self.assertEqual(unpacked.data, 'hello')
 
 
 class TestMessage(unittest.TestCase):
@@ -123,3 +137,14 @@ class TestMessage(unittest.TestCase):
         '''Invokes the touch method'''
         self.response.touch()
         self.response.connection.touch.assert_called_with(self.id)
+
+    def test_pack(self):
+        '''Can pack itself up'''
+        packed = response.Message.pack(
+            self.timestamp, self.attempt, self.id, self.body)[4:]
+        unpacked = response.Response.from_raw(None, packed)
+        self.assertIsInstance(unpacked, response.Message)
+        self.assertEqual(unpacked.timestamp, self.timestamp)
+        self.assertEqual(unpacked.attempts, self.attempt)
+        self.assertEqual(unpacked.id, self.id)
+        self.assertEqual(unpacked.body, self.body)

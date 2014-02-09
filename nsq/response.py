@@ -7,6 +7,8 @@ from . import exceptions
 
 class Response(object):
     '''A response from NSQ'''
+    frame_type = constants.FRAME_TYPE_RESPONSE
+
     @staticmethod
     def from_raw(conn, raw):
         '''Return a new response from a raw buffer'''
@@ -20,6 +22,11 @@ class Response(object):
             return Message(conn, frame_type, message)
         else:
             raise TypeError('Unknown frame type: %s' % frame_type)
+
+    @classmethod
+    def pack(cls, data):
+        '''Pack the provided data into a Response'''
+        return struct.pack('>ll', len(data) + 4, cls.frame_type) + data
 
     def __init__(self, conn, frame_type, data):
         self.connection = conn
@@ -40,6 +47,17 @@ class Message(Response):
     '''A message'''
     format = '>qH16s'
     size = struct.calcsize(format)
+    frame_type = constants.FRAME_TYPE_MESSAGE
+
+    @classmethod
+    def pack(cls, timestamp, attempts, _id, data):
+        return struct.pack(
+            '>llqH16s',
+            len(data) + cls.size + 4,
+            cls.frame_type,
+            timestamp,
+            attempts,
+            _id) + data
 
     def __init__(self, conn, frame_type, data):
         Response.__init__(self, conn, frame_type, data)
@@ -72,6 +90,7 @@ class Error(Response):
     '''An error'''
     # A mapping of the response string to the appropriate exception
     mapping = {}
+    frame_type = constants.FRAME_TYPE_ERROR
 
     @classmethod
     def find(cls, name):

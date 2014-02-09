@@ -10,23 +10,19 @@ from nsq import connection
 from nsq import constants
 from nsq import response
 from nsq import util
+from common import FakeServer
 
 
 class TestConnection(unittest.TestCase):
     '''Test our connection class'''
     def setUp(self):
         self.port = 12345
-        self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self.socket.bind(('', self.port))
-        self.socket.listen(1)
-        self.connection = connection.Connection('', self.port, 0.01)
-        self.server = self.socket.accept()[0]
-        self.server.settimeout(0.1)
+        self.server = FakeServer(self.port)
+        with self.server.accept():
+            self.connection = connection.Connection('', self.port, 0.01)
 
     def tearDown(self):
         self.connection.close()
-        self.socket.close()
         self.server.close()
 
     def pack(self, frame, message):
@@ -38,7 +34,7 @@ class TestConnection(unittest.TestCase):
         found = ''
         while len(found) < length:
             try:
-                found += self.server.recv(length)
+                found += self.server.read(length)
             except socket.timeout:
                 return found
         return found
@@ -107,7 +103,7 @@ class TestConnection(unittest.TestCase):
     def test_magic(self):
         '''Sends the NSQ magic bytes'''
         self.assertEqual(
-            self.server.recv(len(constants.MAGIC_V2)), constants.MAGIC_V2)
+            self.server.read(len(constants.MAGIC_V2)), constants.MAGIC_V2)
 
     def test_read(self):
         '''Can read and not return results'''
@@ -115,18 +111,18 @@ class TestConnection(unittest.TestCase):
 
     def test_read_partial(self):
         '''Returns nothing if it has only read partial results'''
-        self.server.sendall('f')
+        self.server.send('f')
         self.assertEqual(self.connection.read(), [])
 
     def test_read_size_partial(self):
         '''Returns one response size is complete, but content is partial'''
-        self.server.sendall(
+        self.server.send(
             self.pack(constants.FRAME_TYPE_RESPONSE, 'hello')[:-1])
         self.assertEqual(self.connection.read(), [])
 
     def test_read_whole(self):
         '''Returns a single message if it has read a complete one'''
-        self.server.sendall(self.pack(constants.FRAME_TYPE_RESPONSE, 'hello'))
+        self.server.send(self.pack(constants.FRAME_TYPE_RESPONSE, 'hello'))
         expected = response.Response(
             self.connection, constants.FRAME_TYPE_RESPONSE, 'hello')
         self.assertEqual(self.connection.read(), [expected])
@@ -134,7 +130,7 @@ class TestConnection(unittest.TestCase):
     def test_read_multiple(self):
         '''Returns multiple responses if available'''
         packed = self.pack(constants.FRAME_TYPE_RESPONSE, 'hello') * 10
-        self.server.sendall(packed)
+        self.server.send(packed)
         expected = response.Response(
             self.connection, constants.FRAME_TYPE_RESPONSE, 'hello')
         self.assertEqual(self.connection.read(), [expected] * 10)
