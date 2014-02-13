@@ -1,5 +1,7 @@
 from contextlib import contextmanager
+import mock
 import socket
+import unittest
 
 
 class FakeServer(object):
@@ -41,3 +43,15 @@ class FakeServer(object):
         self.close()
         if typ:
             raise typ, value, trace
+
+
+class ClientTest(unittest.TestCase):
+    @contextmanager
+    def patched_get(self):
+        with mock.patch.object(self.client, 'get') as get:
+            yield get
+
+    @contextmanager
+    def patched_post(self):
+        with mock.patch.object(self.client, 'post') as post:
+            yield post
