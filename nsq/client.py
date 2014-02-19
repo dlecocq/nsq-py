@@ -4,7 +4,7 @@ from . import connection
 from . import logger
 from . import exceptions
 from .constants import HEARTBEAT
-from .response import Response, Message, Error
+from .response import Response, Error
 from .clients import nsqlookupd, ClientException
 
 import select
@@ -140,6 +140,7 @@ class Client(object):
                 for res in conn.read():
                     # We'll capture heartbeats and respond to them automatically
                     if (isinstance(res, Response) and res.data == HEARTBEAT):
+                        logger.debug('Sending heartbeat to %s' % conn)
                         conn.nop()
                         continue
                     elif isinstance(res, Error):

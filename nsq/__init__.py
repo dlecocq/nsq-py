@@ -7,7 +7,7 @@ handler.setLevel(logging.DEBUG)
 formatter = logging.Formatter('[%(levelname)s] %(message)s')
 handler.setFormatter(formatter)
 logger.addHandler(handler)
-logger.setLevel(logging.ERROR)
+logger.setLevel(logging.FATAL)
 
 # Our underlying json implmentation
 try:

@@ -25,6 +25,9 @@ class Connection(object):
         self._timeout = timeout
         # Establish our connection
         self.connect()
+        # The last ready time we set our ready count, current ready count
+        self.last_ready_sent = 0
+        self.ready = 0
 
     def __str__(self):
         state = 'alive' if self.alive() else 'dead'
@@ -70,7 +73,10 @@ class Connection(object):
             # message.
             if (len(self._buffer) - 4) >= size:
                 message = self._buffer[4:(size + 4)]
-                responses.append(response.Response.from_raw(self, message))
+                res = response.Response.from_raw(self, message)
+                if isinstance(res, response.Message):
+                    self.ready -= 1
+                responses.append(res)
                 self._buffer = self._buffer[(size + 4):]
             else:
                 break
@@ -141,6 +147,8 @@ class Connection(object):
 
     def rdy(self, count):
         '''Indicate that you're ready to receive'''
+        self.ready = count
+        self.last_ready_sent = count
         return self.send(constants.RDY + ' ' + str(count))
 
     def fin(self, message_id):

@@ -30,10 +30,36 @@ class TestHexify(unittest.TestCase):
         '''Does not transform the value of the text'''
         import ast
         hexified = util.hexify(self.message)
-        print 'Hexified: %s' % hexified
         self.assertEqual(self.message, ast.literal_eval("'%s'" % hexified))
 
     def test_meaningful(self):
         '''The output it gives is meaningful'''
         hexified = util.hexify(self.message)
         self.assertEqual(hexified, '\\x00hello\\x0a\\x09FOO2')
+
+
+class TestDistribute(unittest.TestCase):
+    '''Test the distribute'''
+    def counts(self, total, objects):
+        '''Return a list of the counts returned by distribute'''
+        return zip(*util.distribute(total, objects))[0]
+
+    def count(self, total, objects):
+        '''Return the sum of the counts'''
+        return sum(self.counts(total, objects))
+
+    def test_sum_evenly_divisible(self):
+        '''We get the expected total when total is evenly divisible'''
+        self.assertEqual(self.count(10, range(5)), 10)
+
+    def test_sum_not_evenly_divisible(self):
+        '''We get the expected total when total not evenly divisible'''
+        self.assertEqual(self.count(10, range(3)), 10)
+
+    def test_min_max(self):
+        '''The minimum and maximum should be within 1'''
+        for num in xrange(1, 50):
+            objects = range(num)
+            for total in xrange(1, 50):
+                counts = self.counts(total, objects)
+                self.assertLessEqual(max(counts) - min(counts), 1)
