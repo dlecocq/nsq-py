@@ -17,7 +17,7 @@ class Reader(Client):
         conn = Client.add(self, connection)
         if conn:
             conn.sub(self._topic, self._channel)
-            self.distribute_ready()
+            conn.rdy(1)
 
     def distribute_ready(self):
         '''Distribute the ready state across all of the connections'''
@@ -27,9 +27,8 @@ class Reader(Client):
                 'Max in flight must be greater than number of connections')
         else:
             # Distribute the ready count evenly among the connections
-            logger.info('Redistributing RDY state')
             for count, conn in distribute(self._max_in_flight, connections):
-                logger.debug('Sending RDY %i to %s' % (count, conn))
+                logger.info('Sending RDY %i to %s' % (count, conn))
                 conn.rdy(count)
 
     def needs_distribute_ready(self):
@@ -37,7 +36,13 @@ class Reader(Client):
         # Determine whether or not we need to redistribute the ready state. For
         # now, we'll just to the simple thing and say that if any of the
         # conections has a ready state of 0
-        if min(c.ready for c in self.connections()) == 0:
+        alive = [c for c in self.connections()]
+        # It can happen that a connection receives more messages than we might
+        # believe its RDY state to be. Consider the case where we send one RDY
+        # status, messages are sent back but before we consume them, we send a
+        # second RDY status. In this case, the RDY count might be decremented
+        # below 0.
+        if min([c.ready for c in alive]) <= 0:
             return True
 
     def close_connection(self, connection):

@@ -14,13 +14,17 @@ import threading
 class Client(object):
     '''A client for talking to NSQ over a connection'''
     def __init__(self,
-        lookupd_http_addresses=None, nsqd_tcp_addresses=None, topic=None):
+        lookupd_http_addresses=None, nsqd_tcp_addresses=None, topic=None,
+        timeout=0.1):
         # If lookupd_http_addresses are provided, so must a topic be.
         if lookupd_http_addresses:
             assert topic
 
         # A mapping of (host, port) to our nsqd connection objects
         self._connections = {}
+
+        # The select timeout
+        self._timeout = timeout
 
         # Create clients for each of lookupd instances
         lookupd_http_addresses = lookupd_http_addresses or []
@@ -131,7 +135,11 @@ class Client(object):
         # ourselves with those that require writes
         writes = [c for c in connections if c.pending()]
         readable, writable, exceptable = select.select(
-            connections, writes, connections)
+            connections, writes, connections, self._timeout)
+
+        # If we returned because the timeout interval passed, log it
+        if not (readable or writable or exceptable):
+            logger.debug('Timed out...')
 
         responses = []
         # For each readable socket, we'll try to read some responses
@@ -140,7 +148,7 @@ class Client(object):
                 for res in conn.read():
                     # We'll capture heartbeats and respond to them automatically
                     if (isinstance(res, Response) and res.data == HEARTBEAT):
-                        logger.debug('Sending heartbeat to %s' % conn)
+                        logger.info('Sending heartbeat to %s' % conn)
                         conn.nop()
                         continue
                     elif isinstance(res, Error):

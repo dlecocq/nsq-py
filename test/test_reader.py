@@ -34,11 +34,12 @@ class TestReader(unittest.TestCase):
                     self.topic, self.channel)
 
     def test_new_connections_rdy(self):
-        '''Calls distribute_ready when connections are added'''
-        with mock.patch.object(self.client, 'distribute_ready') as mock_ready:
-            with mock.patch('nsq.reader.Client'):
-                self.client.add(None)
-                mock_ready.assert_called_with()
+        '''Calls rdy(1) when connections are added'''
+        connection = mock.Mock()
+        with mock.patch('nsq.reader.Client') as MockClient:
+            MockClient.add.return_value = connection
+            self.client.add(connection)
+            connection.rdy.assert_called_with(1)
 
     def test_it_checks_max_in_flight(self):
         '''Raises an exception if more connections than in-flight limit'''
@@ -87,6 +88,12 @@ class TestReader(unittest.TestCase):
         connection = self.client.connections()[0]
         with mock.patch.object(connection, 'ready', 10):
             self.assertFalse(self.client.needs_distribute_ready())
+
+    def test_negative_ready(self):
+        '''If clients have negative RDY values, distribute_ready is invoked'''
+        connection = self.client.connections()[0]
+        with mock.patch.object(connection, 'ready', -1):
+            self.assertTrue(self.client.needs_distribute_ready())
 
     def test_read(self):
         '''Read checks if we need to distribute ready'''
