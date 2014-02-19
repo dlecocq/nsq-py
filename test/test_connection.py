@@ -1,8 +1,9 @@
 #! /usr/bin/env python
 
+import mock
 import unittest
 
-import mock
+import errno
 import socket
 import struct
 
@@ -50,13 +51,14 @@ class TestConnection(unittest.TestCase):
 
     def test_blocking(self):
         '''Sets blocking on the socket'''
-        with mock.patch.object(self.connection, '_socket', mock.Mock()):
+        with mock.patch.object(self.connection, '_socket') as mock_socket:
             self.connection.setblocking(0)
-            self.connection._socket.setblocking.assert_called_with(0)
+            mock_socket.setblocking.assert_called_with(0)
 
     def test_pending(self):
         '''Appends to pending'''
-        with mock.patch.object(self.connection, '_socket', mock.Mock()):
+        with mock.patch.object(self.connection, '_socket') as mock_socket:
+            mock_socket.send.return_value = 0
             self.connection.setblocking(0)
             self.connection.nop()
             self.assertEqual(self.connection.pending(),
@@ -65,10 +67,12 @@ class TestConnection(unittest.TestCase):
     def test_flush_partial(self):
         '''Keeps its place when flushing out partial messages'''
         # We'll tell the connection it has only sent one byte when flushing
-        with mock.patch.object(self.connection._socket, 'send', mock.Mock()):
+        with mock.patch.object(self.connection._socket, 'send'):
             self.connection._socket.send.return_value = 1
             self.connection.setblocking(0)
-            self.connection.nop()
+            # Ensure this doesn't eagerly invoke our normal flush
+            with mock.patch.object(self.connection, 'flush'):
+                self.connection.nop()
             self.connection.flush()
             # We expect all but the first byte to remain
             message = constants.NOP + constants.NL
@@ -92,13 +96,36 @@ class TestConnection(unittest.TestCase):
         with mock.patch.object(self.connection._socket, 'send', mock.Mock()):
             self.connection._socket.send.return_value = len(message)
             self.connection.setblocking(0)
-            self.connection.nop()
+            # Ensure this doesn't invoke our normal flush
+            with mock.patch.object(self.connection, 'flush'):
+                self.connection.nop()
             self.assertEqual(self.connection.flush(), len(message))
 
     def test_flush_empty(self):
         '''Returns 0 if there are no pending messages'''
         self.connection.setblocking(0)
         self.assertEqual(self.connection.flush(), 0)
+
+    def test_flush_multiple(self):
+        '''Flushes as many messages as possible'''
+        with mock.patch.object(self.connection, '_pending', ['hello'] * 5):
+            with mock.patch.object(
+                self.connection._socket, 'send', return_value=5):
+                self.connection.flush()
+            self.assertEqual(len(self.connection.pending()), 0)
+
+    def test_flush_would_block(self):
+        '''Honors EAGAIN / EWOULDBLOCK'''
+        with mock.patch.object(self.connection._socket, 'send') as mock_send:
+            mock_send.side_effect = socket.error(errno.EWOULDBLOCK, 'block')
+            self.assertEqual(self.connection.flush(), 0)
+
+    def test_eager_flush(self):
+        '''Sending on a non-blocking connection eagerly flushes'''
+        with mock.patch.object(self.connection, 'flush') as mock_flush:
+            self.connection.setblocking(0)
+            self.connection.send('foo')
+            mock_flush.assert_called_with()
 
     def test_magic(self):
         '''Sends the NSQ magic bytes'''

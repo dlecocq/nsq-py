@@ -4,6 +4,7 @@ from . import response
 from . import util
 from . import json
 
+import errno
 import socket
 import struct
 
@@ -106,17 +107,26 @@ class Connection(object):
         # many messages-worth might be sent. An alternative would be to keep
         # around a single string of the data that remains to be sent so that we
         # could potentially send larger messages
-        if self._pending:
-            # Try to send as much of the first message as possible
-            count = self._socket.send(self._pending[0])
-            if count < len(self._pending[0]):
-                # Save the rest of the message that could not be sent
-                self._pending[0] = self._pending[0][count:]
-            else:
-                # Otherwise, pop off this message
-                self._pending.pop(0)
-            return count
-        return 0
+        total = 0
+        while self._pending:
+            try:
+                # Try to send as much of the first message as possible
+                count = self._socket.send(self._pending[0])
+                if count < len(self._pending[0]):
+                    # Save the rest of the message that could not be sent
+                    self._pending[0] = self._pending[0][count:]
+                    break
+                else:
+                    # Otherwise, pop off this message
+                    self._pending.pop(0)
+                    total += count
+            except socket.error as exc:
+                num = exc.args
+                if num == errno.EAGAIN:
+                    break
+                else:
+                    raise
+        return total
 
     def send(self, command, message=None):
         '''Send a command over the socket with length endcoded'''
@@ -128,6 +138,7 @@ class Connection(object):
             self._socket.sendall(joined)
         else:
             self._pending.append(joined)
+            self.flush()
 
     def identify(self, data):
         '''Send an identification message'''
