@@ -27,7 +27,9 @@ class TestNsqdClient(ClientTest):
             messages = map(str, range(10))
             self.client.mpub('topic', messages)
             post.assert_called_with(
-                '/mpub', params={'topic': 'topic'}, data=pack(messages))
+                '/mpub',
+                params={'topic': 'topic', 'binary': True},
+                data=pack(messages)[4:])
 
     def test_mpub_ascii_exception(self):
         '''Raises an exception when ascii-mpub-ing messages with newline'''
