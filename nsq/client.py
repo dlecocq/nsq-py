@@ -48,19 +48,19 @@ class Client(object):
                     producers.append(
                         (producer['broadcast_address'], producer['tcp_port']))
             except ClientException:
-                logger.exception('Failed to query %s' % lookupd)
+                logger.exception('Failed to query %s', lookupd)
 
         new = []
         for host, port in producers:
             conn = self._connections.get((host, port))
             if not conn:
-                logger.info('Discovered %s:%s' % (host, port))
+                logger.info('Discovered %s:%s', host, port)
                 new.append(self.connect(host, port))
             elif not conn.alive():
-                logger.info('Reconnecting to %s:%s' % (host, port))
+                logger.info('Reconnecting to %s:%s', host, port)
                 conn.connect()
             else:
-                logger.debug('Connection to %s:%s still alive' % (host, port))
+                logger.debug('Connection to %s:%s still alive', host, port)
 
         # And return all the new connections
         return [conn for conn in new if conn]
@@ -77,7 +77,7 @@ class Client(object):
             conn = self._connections.get((host, port), None)
             # If there is no connection to it, we have to try to connect
             if not conn:
-                logger.info('Connecting to %s:%s' % (host, port))
+                logger.info('Connecting to %s:%s', host, port)
                 self.connect(host, port)
             elif not conn.alive():
                 # If we've connected to it before, but it's no longer alive,
@@ -115,7 +115,7 @@ class Client(object):
         try:
             self.close_connection(found)
         except Exception as exc:
-            logger.warn('Failed to close %s: %s' % (connection, exc))
+            logger.warn('Failed to close %s: %s', connection, exc)
         return found
 
     def close_connection(self, connection):
@@ -148,7 +148,7 @@ class Client(object):
                 for res in conn.read():
                     # We'll capture heartbeats and respond to them automatically
                     if (isinstance(res, Response) and res.data == HEARTBEAT):
-                        logger.info('Sending heartbeat to %s' % conn)
+                        logger.info('Sending heartbeat to %s', conn)
                         conn.nop()
                         continue
                     elif isinstance(res, Error):
@@ -161,11 +161,11 @@ class Client(object):
                             # If it's not any of the non-fatal exceptions, then
                             # we have to close this connection
                             logger.error(
-                                'Closing %s: %s' % (conn, res.exception()))
+                                'Closing %s: %s', conn, res.exception())
                             self.close_connection(conn)
                     responses.append(res)
             except exceptions.NSQException:
-                logger.exception('Failed to read from %s' % conn)
+                logger.exception('Failed to read from %s', conn)
                 self.close_connection(conn)
 
         # For each writable socket, flush some data out

@@ -63,13 +63,13 @@ class Connection(object):
             return []
 
         # Append our newly-read data to our buffer
-        logger.debug('Read %s from socket' % packet)
+        logger.debug('Read %s from socket', packet)
         self._buffer += packet
 
         responses = []
         while len(self._buffer) >= 4:
             size = struct.unpack('>l', self._buffer[:4])[0]
-            logger.debug('Read size of %s' % size)
+            logger.debug('Read size of %s', size)
             # Now check to see if there's enough left in the buffer to read the
             # message.
             if (len(self._buffer) - 4) >= size:

@@ -28,7 +28,7 @@ class Reader(Client):
         else:
             # Distribute the ready count evenly among the connections
             for count, conn in distribute(self._max_in_flight, connections):
-                logger.info('Sending RDY %i to %s' % (count, conn))
+                logger.info('Sending RDY %i to %s', count, conn)
                 conn.rdy(count)
 
     def needs_distribute_ready(self):
