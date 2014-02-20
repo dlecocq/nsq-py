@@ -10,11 +10,11 @@ TCP Clients
 This library will provide bindings for the TCP interface of `nsqd`, compatible
 with three frameworks:
 
-1) `threading` / `select` which should be sufficient for most cases, except for
+1. `threading` / `select` which should be sufficient for most cases, except for
     those using a large number of `nsqd` instances
-2) `gevent`, which is actually merely a wrapping of the above with
+2. `gevent`, which is actually merely a wrapping of the above with
     monkey-patched `threading` and `select` and
-3) `tornado` for those used to the original official python client.
+3. `tornado` for those used to the original official python client.
 
 It also provides the building blocks for exending this client to work with other
 frameworks as well.
@@ -79,3 +79,29 @@ with closing(Reader('topic', 'channel', ...)) as reader:
     for message in reader:
         ....
 ```
+
+Benchmarks
+==========
+The `bench` directory includes some tools for benchmarking consumers, including
+bootstrapping several local `nsqd` instances against which to run. At the time
+of writing, on a 2011 MacBook Pro the `select`-based `Reader` was able to
+consume and finish about 44k messages / second.
+
+Running Tests
+=============
+You'll need to install a few dependencies before invoking the tests:
+
+```python
+pip install -r requirements.txt
+make test
+```
+
+This should run the tests and provide coverage information.
+
+Contributing
+============
+Help is always appreciated. If you add functionality, please:
+
+- include a failing test in one commit
+- a fix for the failing test in a subsequent commit
+- don't decrease the code coverage
