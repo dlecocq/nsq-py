@@ -125,6 +125,16 @@ class TestReader(unittest.TestCase):
             found = [iterator.next() for _ in range(10)]
             self.assertEqual(messages, found)
 
+    def test_iter_repeated_read(self):
+        '''Repeatedly calls read in iterator mode'''
+        iterator = iter(self.client)
+        message_id = uuid.uuid4().hex[0:16]
+        packed = response.Message.pack(0, 0, message_id, 'hello')
+        messages = [response.Message(None, None, packed) for _ in range(10)]
+        for message in messages:
+            with mock.patch.object(self.client, 'read', return_value=[message]):
+                self.assertEqual(iterator.next(), message)
+
     def test_skip_non_messages(self):
         '''Skips all non-messages'''
         iterator = iter(self.client)
