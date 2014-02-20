@@ -41,8 +41,8 @@ class Connection(object):
         self._socket.settimeout(self._timeout)
         self._socket.connect((self.host, self.port))
         self._socket.send(constants.MAGIC_V2)
-        # I'm not quite sure why this breaks tests, but it seems right
-        # self._socket.setblocking(self._blocking)
+        # Set our socket's blocking state to whatever ours is
+        self._socket.setblocking(self._blocking)
 
     def close(self):
         '''Close our connection'''
@@ -60,7 +60,14 @@ class Connection(object):
         try:
             packet = self._socket.recv(4096)
         except socket.timeout:
+            # If the socket times out, return nothing
             return []
+        except socket.error as exc:
+            # Catch (errno, message)-type socket.errors
+            if exc.args[0] == errno.EAGAIN:
+                return []
+            else:
+                raise
 
         # Append our newly-read data to our buffer
         logger.debug('Read %s from socket', packet)
@@ -121,8 +128,8 @@ class Connection(object):
                     self._pending.pop(0)
                     total += count
             except socket.error as exc:
-                num = exc.args
-                if num == errno.EAGAIN:
+                # Catch (errno, message)-type socket.errors
+                if exc.args[0] == errno.EAGAIN:
                     break
                 else:
                     raise

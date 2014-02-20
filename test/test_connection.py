@@ -116,9 +116,17 @@ class TestConnection(unittest.TestCase):
 
     def test_flush_would_block(self):
         '''Honors EAGAIN / EWOULDBLOCK'''
-        with mock.patch.object(self.connection._socket, 'send') as mock_send:
-            mock_send.side_effect = socket.error(errno.EWOULDBLOCK, 'block')
-            self.assertEqual(self.connection.flush(), 0)
+        with mock.patch.object(self.connection, '_socket') as mock_socket:
+            with mock.patch.object(self.connection, '_pending', [1, 2, 3]):
+                mock_socket.send.side_effect = socket.error(errno.EAGAIN)
+                self.assertEqual(self.connection.flush(), 0)
+
+    def test_flush_socket_error(self):
+        '''Re-raises socket non-EAGAIN errors'''
+        with mock.patch.object(self.connection, '_socket') as mock_socket:
+            with mock.patch.object(self.connection, '_pending', [1, 2, 3]):
+                mock_socket.send.side_effect = socket.error('foo')
+                self.assertRaises(socket.error, self.connection.flush)
 
     def test_eager_flush(self):
         '''Sending on a non-blocking connection eagerly flushes'''
@@ -132,8 +140,21 @@ class TestConnection(unittest.TestCase):
         self.assertEqual(
             self.server.read(len(constants.MAGIC_V2)), constants.MAGIC_V2)
 
-    def test_read(self):
-        '''Can read and not return results'''
+    def test_read_timeout(self):
+        '''Returns no results after a socket timeout'''
+        with mock.patch.object(self.connection, '_socket') as mock_socket:
+            mock_socket.recv.side_effect = socket.timeout
+            self.assertEqual(self.connection.read(), [])
+
+    def test_read_socket_error(self):
+        '''Re-raises socket non-errno socket errors'''
+        with mock.patch.object(self.connection, '_socket') as mock_socket:
+            mock_socket.recv.side_effect = socket.error('foo')
+            self.assertRaises(socket.error, self.connection.read)
+
+    def test_read_would_block(self):
+        '''Returns no results if it would block'''
+        self.connection.setblocking(0)
         self.assertEqual(self.connection.read(), [])
 
     def test_read_partial(self):
@@ -166,6 +187,26 @@ class TestConnection(unittest.TestCase):
         '''Returns the connection's file descriptor appropriately'''
         self.assertEqual(
             self.connection.fileno(), self.connection._socket.fileno())
+
+    def test_str_alive(self):
+        '''Sane str representation for an alive connection'''
+        with mock.patch.object(self.connection, 'alive', return_value=True):
+            with mock.patch.object(
+                self.connection, 'fileno', return_value=7):
+                with mock.patch.object(self.connection, 'host', 'host'):
+                    with mock.patch.object(self.connection, 'port', 'port'):
+                        self.assertEqual(str(self.connection),
+                            '<Connection host:port (alive on FD 7)>')
+
+    def test_str_dead(self):
+        '''Sane str representation for an alive connection'''
+        with mock.patch.object(self.connection, 'alive', return_value=False):
+            with mock.patch.object(
+                self.connection, 'fileno', return_value=7):
+                with mock.patch.object(self.connection, 'host', 'host'):
+                    with mock.patch.object(self.connection, 'port', 'port'):
+                        self.assertEqual(str(self.connection),
+                            '<Connection host:port (dead on FD 7)>')
 
     def test_send_no_message(self):
         '''Appropriately sends packed data without message'''
