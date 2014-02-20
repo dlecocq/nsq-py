@@ -83,6 +83,22 @@ class TestClient(unittest.TestCase):
             self.client.read()
             self.assertFalse(connection.alive())
 
+    def test_read_writable(self):
+        '''Read flushes any writable connections'''
+        with mock.patch('nsq.client.select') as MockSelect:
+            connection = mock.Mock()
+            MockSelect.select.return_value = ([], [connection], [])
+            self.client.read()
+            connection.flush.assert_called_with()
+
+    def test_read_exceptions(self):
+        '''Read flushes any writable connections'''
+        with mock.patch('nsq.client.select') as MockSelect:
+            connection = mock.Mock()
+            MockSelect.select.return_value = ([], [], [connection])
+            self.client.read()
+            connection.close.assert_called_with()
+
 
 class TestClientNsqd(unittest.TestCase):
     '''Test our client class'''
