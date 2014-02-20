@@ -7,7 +7,9 @@ from . import exceptions
 
 class Response(object):
     '''A response from NSQ'''
-    frame_type = constants.FRAME_TYPE_RESPONSE
+    FRAME_TYPE = constants.FRAME_TYPE_RESPONSE
+
+    __slots__ = ('connection', 'frame_type', 'data')
 
     @staticmethod
     def from_raw(conn, raw):
@@ -26,12 +28,12 @@ class Response(object):
     @classmethod
     def pack(cls, data):
         '''Pack the provided data into a Response'''
-        return struct.pack('>ll', len(data) + 4, cls.frame_type) + data
+        return struct.pack('>ll', len(data) + 4, cls.FRAME_TYPE) + data
 
     def __init__(self, conn, frame_type, data):
         self.connection = conn
-        self.frame_type = frame_type
         self.data = data
+        self.frame_type = frame_type
 
     def __str__(self):
         return '%s - %s' % (self.__class__.__name__, self.data)
@@ -45,16 +47,19 @@ class Response(object):
 
 class Message(Response):
     '''A message'''
+    FRAME_TYPE = constants.FRAME_TYPE_MESSAGE
+
     format = '>qH16s'
     size = struct.calcsize(format)
-    frame_type = constants.FRAME_TYPE_MESSAGE
+
+    __slots__ = ('timestamp', 'attempts', 'id', 'body')
 
     @classmethod
     def pack(cls, timestamp, attempts, _id, data):
         return struct.pack(
             '>llqH16s',
             len(data) + cls.size + 4,
-            cls.frame_type,
+            cls.FRAME_TYPE,
             timestamp,
             attempts,
             _id) + data
@@ -88,9 +93,10 @@ class Message(Response):
 
 class Error(Response):
     '''An error'''
+    FRAME_TYPE = constants.FRAME_TYPE_ERROR
+
     # A mapping of the response string to the appropriate exception
     mapping = {}
-    frame_type = constants.FRAME_TYPE_ERROR
 
     @classmethod
     def find(cls, name):
