@@ -101,10 +101,10 @@ class Error(Response):
     @classmethod
     def find(cls, name):
         '''Find the exception class by name'''
-        if not cls.mapping:
+        if not cls.mapping:  # pragma: no branch
             for _, obj in inspect.getmembers(exceptions):
                 if inspect.isclass(obj):
-                    if issubclass(obj, exceptions.NSQException):
+                    if issubclass(obj, exceptions.NSQException):  # pragma: no branch
                         if hasattr(obj, 'name'):
                             cls.mapping[obj.name] = obj
         klass = cls.mapping.get(name)

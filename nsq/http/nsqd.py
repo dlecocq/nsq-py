@@ -77,19 +77,19 @@ class Client(BaseClient):
     def delete_channel(self, topic, channel):
         '''Delete the channel in the provided topic'''
         return self.get(
-            '/create_channel', params={'topic': topic, 'channel': channel})
+            '/delete_channel', params={'topic': topic, 'channel': channel})
 
     @json_wrap
     def pause_channel(self, topic, channel):
         '''Pause the channel in the provided topic'''
         return self.get(
-            '/create_channel', params={'topic': topic, 'channel': channel})
+            '/pause_channel', params={'topic': topic, 'channel': channel})
 
     @json_wrap
     def unpause_channel(self, topic, channel):
         '''Unpause the channel in the provided topic'''
         return self.get(
-            '/create_channel', params={'topic': topic, 'channel': channel})
+            '/unpause_channel', params={'topic': topic, 'channel': channel})
 
     @json_wrap
     def stats(self):
@@ -99,11 +99,11 @@ class Client(BaseClient):
     def clean_stats(self):
         '''Stats with topics and channels keyed on topic and channel names'''
         stats = self.stats()
-        if 'topics' in stats:
+        if 'topics' in stats:  # pragma: no branch
             topics = stats['topics']
             topics = dict((t.pop('topic_name'), t) for t in topics)
             for topic, data in topics.items():
-                if 'channels' in data:
+                if 'channels' in data:  # pragma: no branch
                     channels = data['channels']
                     channels = dict(
                         (c.pop('channel_name'), c) for c in channels)

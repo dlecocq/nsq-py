@@ -75,12 +75,14 @@ class TestNsqdClientIntegration(IntegrationTest):
             # And now it exists afterwards
             self.assertIn(topic, self.nsqd.clean_stats()['topics'])
 
-    # def test_empty_topic(self):
-    #     '''We can drain a topic'''
-    #     self.nsqd.pub(self.topic, 'foo')
-    #     self.nsqd.empty_topic(self.topic)
-    #     topic = self.nsqd.clean_stats()['topics'][self.topic]
-    #     self.assertEqual(topic['channels'][self.channel]['depth'], 0)
+    def test_empty_topic(self):
+        '''We can drain a topic'''
+        topic = uuid.uuid4().hex
+        with self.delete_topic(topic):
+            self.nsqd.pub(topic, 'foo')
+            self.nsqd.empty_topic(topic)
+            depth = self.nsqd.clean_stats()['topics'][topic]['depth']
+            self.assertEqual(depth, 0)
 
     def test_delete_topic(self):
         '''We can delete a topic'''
@@ -102,10 +104,42 @@ class TestNsqdClientIntegration(IntegrationTest):
 
     def test_create_channel(self):
         '''We can create a channel'''
-        # This is pending, related to an issue:
-        #   https://github.com/bitly/nsq/issues/313
-        # self.nsqd.create_channel(self.topic, self.channel)
-        # self.assertEqual(self.nsqd.stats(), {})
+        topic = uuid.uuid4().hex
+        channel = uuid.uuid4().hex
+        with self.delete_topic(topic):
+            self.nsqd.create_topic(topic)
+            self.nsqd.create_channel(topic, channel)
+            topic = self.nsqd.clean_stats()['topics'][topic]
+            self.assertIn(channel, topic['channels'])
+
+    def test_empty_channel(self):
+        '''Can clear the messages out in a channel'''
+        self.nsqd.pub(self.topic, self.channel)
+        self.nsqd.empty_channel(self.topic, self.channel)
+        topic = self.nsqd.clean_stats()['topics'][self.topic]
+        channel = topic['channels'][self.channel]
+        self.assertEqual(channel['depth'], 0)
+
+    def test_delete_channel(self):
+        '''Can delete a channel in a topic'''
+        self.nsqd.delete_channel(self.topic, self.channel)
+        topic = self.nsqd.clean_stats()['topics'][self.topic]
+        self.assertNotIn(self.channel, topic['channels'])
+
+    def test_pause_channel(self):
+        '''Can pause a channel'''
+        self.nsqd.pause_channel(self.topic, self.channel)
+        topic = self.nsqd.clean_stats()['topics'][self.topic]
+        channel = topic['channels'][self.channel]
+        self.assertTrue(channel['paused'])
+
+    def test_unpause_channel(self):
+        '''Can unpause a channel'''
+        self.nsqd.pause_channel(self.topic, self.channel)
+        self.nsqd.unpause_channel(self.topic, self.channel)
+        topic = self.nsqd.clean_stats()['topics'][self.topic]
+        channel = topic['channels'][self.channel]
+        self.assertFalse(channel['paused'])
 
     def test_clean_stats(self):
         '''Clean stats turns 'topics' and 'channels' into dictionaries'''
@@ -113,6 +147,3 @@ class TestNsqdClientIntegration(IntegrationTest):
         self.assertIsInstance(stats['topics'], dict)
         self.assertIsInstance(
             stats['topics'][self.topic]['channels'], dict)
-
-if __name__ == '__main__':
-    unittest.main()
