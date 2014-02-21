@@ -1,27 +1,24 @@
 import mock
-import unittest
 
 import uuid
 
 from nsq import reader
 from nsq import response
 
-from common import FakeServer, IntegrationTest
+from common import FakeServerTest, IntegrationTest
 
 
-class TestReader(unittest.TestCase):
+class TestReader(FakeServerTest):
     '''Tests for our reader class'''
     def setUp(self):
         self.topic = 'foo-topic'
         self.channel = 'foo-channel'
-        self.server = FakeServer(12345)
-        with self.server.accept():
-            self.client = reader.Reader(self.topic, self.channel,
-                nsqd_tcp_addresses=['localhost:12345'])
+        FakeServerTest.setUp(self)
 
-    def tearDown(self):
-        self.server.close()
-        self.client.close()
+    def connect(self):
+        '''Return a connection'''
+        return reader.Reader(self.topic, self.channel,
+            nsqd_tcp_addresses=['localhost:12345'])
 
     def test_it_subscribes(self):
         '''It subscribes for newly-established connections'''
@@ -158,6 +155,12 @@ class TestReader(unittest.TestCase):
         with mock.patch.object(self.client, 'read', return_value=responses):
             found = [iterator.next() for _ in range(10)]
             self.assertEqual(messages, found)
+
+    def test_honors_max_rdy_count(self):
+        '''Honors the max RDY count provided in an identify response'''
+        with self.identify({'max_rdy_count': 10}):
+            self.client.distribute_ready()
+            self.assertEqual(self.client.connections()[0].ready, 10)
 
 
 class TestReaderIntegration(IntegrationTest):

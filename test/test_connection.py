@@ -394,4 +394,4 @@ class TestConnection(FakeServerTest):
     def test_identify_saves_max_rdy_count(self):
         '''Saves the max ready count if it's provided'''
         with self.identify({'max_rdy_count': 100}):
-            self.assertEqual(self.client._max_rdy_count, 100)
+            self.assertEqual(self.client.max_rdy_count, 100)

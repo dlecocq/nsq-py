@@ -43,7 +43,7 @@ class Connection(object):
         self._identify_options.setdefault('user_agent', self.USER_AGENT)
 
         # Some settings that may be determined by an identify response
-        self._max_rdy_count = sys.maxint
+        self.max_rdy_count = sys.maxint
 
         # Check for any options we don't support
         disallowed = ('tls_v1', 'snappy', 'deflate', 'deflate_level')
@@ -132,8 +132,8 @@ class Connection(object):
             res.data = json.loads(res.data)
             self._identify_response = res.data
             # Save our max ready count unless it's not provided
-            self._max_rdy_count = res.data.get(
-                'max_rdy_count', self._max_rdy_count)
+            self.max_rdy_count = res.data.get(
+                'max_rdy_count', self.max_rdy_count)
         except:
             pass
         finally:
