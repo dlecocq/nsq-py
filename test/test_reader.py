@@ -5,16 +5,15 @@ import uuid
 
 from nsq import reader
 from nsq import response
-from nsq.clients import nsqd
 
-from common import FakeServer
+from common import FakeServer, IntegrationTest
 
 
 class TestReader(unittest.TestCase):
     '''Tests for our reader class'''
     def setUp(self):
-        self.topic = 'topic'
-        self.channel = 'channel'
+        self.topic = 'foo-topic'
+        self.channel = 'foo-channel'
         self.server = FakeServer(12345)
         with self.server.accept():
             self.client = reader.Reader(self.topic, self.channel,
@@ -149,12 +148,10 @@ class TestReader(unittest.TestCase):
             self.assertEqual(messages, found)
 
 
-class TestReaderIntegration(unittest.TestCase):
+class TestReaderIntegration(IntegrationTest):
     '''Integration test for the Reader'''
     def setUp(self):
-        self.topic = 'topic'
-        self.channel = 'channel'
-        self.nsqd = nsqd.Client('http://localhost:4151')
+        IntegrationTest.setUp(self)
         self.reader = reader.Reader(
             self.topic, self.channel, nsqd_tcp_addresses=['localhost:4150'])
 

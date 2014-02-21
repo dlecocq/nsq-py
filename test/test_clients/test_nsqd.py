@@ -1,9 +1,10 @@
-from contextlib import contextmanager
+import unittest
+
 import uuid
 
 from nsq.clients import nsqd, ClientException
 from nsq.util import pack
-from common import ClientTest
+from common import IntegrationTest, ClientTest
 
 
 class TestNsqdClient(ClientTest):
@@ -38,99 +39,80 @@ class TestNsqdClient(ClientTest):
             ClientException, self.client.mpub, 'topic', messages, binary=False)
 
 
-class TestNsqdClientIntegration(ClientTest):
+class TestNsqdClientIntegration(IntegrationTest):
     '''An integration test of the nsqd client'''
-    def setUp(self):
-        self.topic = 'foo-topic'
-        self.channel = 'foo-channel'
-        self.client = nsqd.Client('http://localhost:4151')
-        try:
-            self.client.ping()
-        except ClientException:
-            print 'Make sure nqsd is running locally on 4151'
-            raise
-        self.client.create_topic(self.topic)
-        self.client.create_channel(self.topic, self.channel)
-
-    def tearDown(self):
-        try:
-            self.client.delete_channel(self.topic, self.channel)
-        except ClientException:
-            pass
-        self.client.delete_topic(self.topic)
-
-    @contextmanager
-    def delete_topic(self, topic):
-        '''Delete a topic after running'''
-        try:
-            yield
-        finally:
-            self.client.delete_topic(topic)
-
     def test_ping_ok(self):
         '''Make sure ping works in a basic way'''
-        self.assertEqual(self.client.ping(), 'OK')
+        self.assertEqual(self.nsqd.ping(), 'OK')
 
     def test_info(self):
         '''Info works in a basic way'''
-        self.assertIn('version', self.client.info()['data'])
+        self.assertIn('version', self.nsqd.info()['data'])
 
     def test_pub(self):
         '''Publishing a message works as expected'''
-        self.assertEqual(self.client.pub(self.topic, 'message'), 'OK')
-        topic = self.client.clean_stats()['data']['topics'][self.topic]
+        self.assertEqual(self.nsqd.pub(self.topic, 'message'), 'OK')
+        topic = self.nsqd.clean_stats()['data']['topics'][self.topic]
         self.assertEqual(topic['channels'][self.channel]['depth'], 1)
 
     def test_mpub_ascii(self):
         '''Publishing messages in ascii works as expected'''
         messages = map(str, range(100))
-        self.assertTrue(self.client.mpub(self.topic, messages, binary=False))
+        self.assertTrue(self.nsqd.mpub(self.topic, messages, binary=False))
 
     def test_mpub_binary(self):
         '''Publishing messages in binary works as expected'''
         messages = map(str, range(100))
-        self.assertTrue(self.client.mpub(self.topic, messages))
+        self.assertTrue(self.nsqd.mpub(self.topic, messages))
 
     def test_create_topic(self):
         '''Topic creation should work'''
         topic = uuid.uuid4().hex
         with self.delete_topic(topic):
-            self.assertTrue(self.client.create_topic(topic))
+            # Ensure the topic doesn't exist beforehand
+            self.assertNotIn(topic, self.nsqd.clean_stats()['data']['topics'])
+            self.assertTrue(self.nsqd.create_topic(topic))
+            # And now it exists afterwards
+            self.assertIn(topic, self.nsqd.clean_stats()['data']['topics'])
 
-    def test_empty_topic(self):
-        '''We can drain a topic'''
-        # This is pending, related to an issue:
-        #   https://github.com/bitly/nsq/issues/313
-        # self.client.pub(self.topic, 'foo')
-        # topic = self.client.clean_stats()['data']['topics'][self.topic]
-        # self.assertEqual(topic['channels'][self.channel]['depth'], 0)
+    # def test_empty_topic(self):
+    #     '''We can drain a topic'''
+    #     self.nsqd.pub(self.topic, 'foo')
+    #     self.nsqd.empty_topic(self.topic)
+    #     topic = self.nsqd.clean_stats()['data']['topics'][self.topic]
+    #     self.assertEqual(topic['channels'][self.channel]['depth'], 0)
 
     def test_delete_topic(self):
         '''We can delete a topic'''
         topic = uuid.uuid4().hex
-        self.client.create_topic(topic)
-        self.assertTrue(self.client.delete_topic(topic))
-        self.assertRaises(ClientException, self.client.delete_topic, topic)
+        with self.delete_topic(topic):
+            self.nsqd.create_topic(topic)
+            self.assertTrue(self.nsqd.delete_topic(topic))
+            # Ensure the topic doesn't exist afterwards
+            self.assertNotIn(topic, self.nsqd.clean_stats()['data']['topics'])
 
     def test_pause_topic(self):
         '''We can pause a topic'''
-        self.assertTrue(self.client.pause_topic(self.topic))
+        self.assertTrue(self.nsqd.pause_topic(self.topic))
 
     def test_unpause_topic(self):
         '''We can unpause a topic'''
-        self.client.pause_topic(self.topic)
-        self.assertTrue(self.client.unpause_topic(self.topic))
+        self.nsqd.pause_topic(self.topic)
+        self.assertTrue(self.nsqd.unpause_topic(self.topic))
 
     def test_create_channel(self):
         '''We can create a channel'''
         # This is pending, related to an issue:
         #   https://github.com/bitly/nsq/issues/313
-        # self.client.create_channel(self.topic, self.channel)
-        # self.assertEqual(self.client.stats(), {})
+        # self.nsqd.create_channel(self.topic, self.channel)
+        # self.assertEqual(self.nsqd.stats(), {})
 
     def test_clean_stats(self):
         '''Clean stats turns 'topics' and 'channels' into dictionaries'''
-        stats = self.client.clean_stats()
+        stats = self.nsqd.clean_stats()
         self.assertIsInstance(stats['data']['topics'], dict)
         self.assertIsInstance(
             stats['data']['topics'][self.topic]['channels'], dict)
+
+if __name__ == '__main__':
+    unittest.main()
