@@ -38,6 +38,14 @@ class TestClientNsqd(FakeServerTest):
             with mock.patch.object(connection, 'close', side_effect=Exception):
                 self.assertEqual(self.client.remove(connection), connection)
 
+    def test_honors_identify_options(self):
+        '''Sends along identify options to each connection as it's created'''
+        with mock.patch('nsq.client.connection.Connection') as MockConnection:
+            with mock.patch.object(
+                self.client, '_identify_options', {'foo': 'bar'}):
+                self.client.connect('foo', 'bar')
+                MockConnection.assert_called_with('foo', 'bar', foo='bar')
+
 
 class TestClientLookupd(FakeServerTest):
     '''Test our client class'''

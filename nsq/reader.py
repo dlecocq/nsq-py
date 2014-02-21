@@ -7,10 +7,11 @@ from . import logger
 class Reader(Client):
     '''A client meant exclusively for reading'''
     def __init__(self, topic, channel, lookupd_http_addresses=None,
-        nsqd_tcp_addresses=None, max_in_flight=200):
+        nsqd_tcp_addresses=None, max_in_flight=200, **identify):
         self._channel = channel
         self._max_in_flight = max_in_flight
-        Client.__init__(self, lookupd_http_addresses, nsqd_tcp_addresses, topic)
+        Client.__init__(
+            self, lookupd_http_addresses, nsqd_tcp_addresses, topic, **identify)
 
     def add(self, connection):
         '''Add this connection and manipulate its RDY state'''
