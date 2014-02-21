@@ -1,4 +1,4 @@
-from nsq.clients import nsqlookupd
+from nsq.http import nsqlookupd
 from common import ClientTest
 
 

@@ -5,7 +5,7 @@ from . import logger
 from . import exceptions
 from .constants import HEARTBEAT
 from .response import Response, Error
-from .clients import nsqlookupd, ClientException
+from .http import nsqlookupd, ClientException
 
 import select
 import threading

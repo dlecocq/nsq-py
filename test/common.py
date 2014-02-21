@@ -3,7 +3,7 @@ import mock
 import socket
 import unittest
 
-from nsq.clients import ClientException, nsqd, nsqlookupd
+from nsq.http import ClientException, nsqd, nsqlookupd
 
 
 class FakeServer(object):

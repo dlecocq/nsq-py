@@ -5,7 +5,7 @@ from nsq import client
 from nsq import response
 from nsq import constants
 from nsq import exceptions
-from nsq.clients import ClientException
+from nsq.http import ClientException
 
 from common import FakeServer
 

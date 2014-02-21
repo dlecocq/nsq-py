@@ -2,7 +2,7 @@ import unittest
 
 import uuid
 
-from nsq.clients import nsqd, ClientException
+from nsq.http import nsqd, ClientException
 from nsq.util import pack
 from common import IntegrationTest, ClientTest
 
