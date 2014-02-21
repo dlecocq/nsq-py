@@ -22,7 +22,7 @@ frameworks as well.
 HTTP Clients
 ------------
 This also provides bindings for the HTTP interfaces of `nsqlookupd` and `nsqd`
-for convenience.
+for convenience in `nsq.http`.
 
 Primitives
 ==========
