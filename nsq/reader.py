@@ -33,21 +33,15 @@ class Reader(Client):
 
     def needs_distribute_ready(self):
         '''Determine whether or not we need to redistribute the ready state'''
-        # Determine whether or not we need to redistribute the ready state. For
-        # now, we'll just to the simple thing and say that if any of the
-        # conections has a ready state of 0
-        alive = [c for c in self.connections() if c.alive()]
+        # Try to pre-empty starvation by comparing current RDY against
+        # the last value sent.
+        alive = [c for c in self.connections()]
 
         # If we have no active connections, of course we can't distribute RDY
         if not alive:
             return False
 
-        # It can happen that a connection receives more messages than we might
-        # believe its RDY state to be. Consider the case where we send one RDY
-        # status, messages are sent back but before we consume them, we send a
-        # second RDY status. In this case, the RDY count might be decremented
-        # below 0.
-        if min([c.ready for c in alive]) <= 0:
+        if any(c.ready <= (c.last_ready_sent * 0.25) for c in alive):
             return True
 
     def close_connection(self, connection):
