@@ -47,12 +47,12 @@ class TestNsqdClientIntegration(IntegrationTest):
 
     def test_info(self):
         '''Info works in a basic way'''
-        self.assertIn('version', self.nsqd.info()['data'])
+        self.assertIn('version', self.nsqd.info())
 
     def test_pub(self):
         '''Publishing a message works as expected'''
         self.assertEqual(self.nsqd.pub(self.topic, 'message'), 'OK')
-        topic = self.nsqd.clean_stats()['data']['topics'][self.topic]
+        topic = self.nsqd.clean_stats()['topics'][self.topic]
         self.assertEqual(topic['channels'][self.channel]['depth'], 1)
 
     def test_mpub_ascii(self):
@@ -70,16 +70,16 @@ class TestNsqdClientIntegration(IntegrationTest):
         topic = uuid.uuid4().hex
         with self.delete_topic(topic):
             # Ensure the topic doesn't exist beforehand
-            self.assertNotIn(topic, self.nsqd.clean_stats()['data']['topics'])
+            self.assertNotIn(topic, self.nsqd.clean_stats()['topics'])
             self.assertTrue(self.nsqd.create_topic(topic))
             # And now it exists afterwards
-            self.assertIn(topic, self.nsqd.clean_stats()['data']['topics'])
+            self.assertIn(topic, self.nsqd.clean_stats()['topics'])
 
     # def test_empty_topic(self):
     #     '''We can drain a topic'''
     #     self.nsqd.pub(self.topic, 'foo')
     #     self.nsqd.empty_topic(self.topic)
-    #     topic = self.nsqd.clean_stats()['data']['topics'][self.topic]
+    #     topic = self.nsqd.clean_stats()['topics'][self.topic]
     #     self.assertEqual(topic['channels'][self.channel]['depth'], 0)
 
     def test_delete_topic(self):
@@ -89,7 +89,7 @@ class TestNsqdClientIntegration(IntegrationTest):
             self.nsqd.create_topic(topic)
             self.assertTrue(self.nsqd.delete_topic(topic))
             # Ensure the topic doesn't exist afterwards
-            self.assertNotIn(topic, self.nsqd.clean_stats()['data']['topics'])
+            self.assertNotIn(topic, self.nsqd.clean_stats()['topics'])
 
     def test_pause_topic(self):
         '''We can pause a topic'''
@@ -110,9 +110,9 @@ class TestNsqdClientIntegration(IntegrationTest):
     def test_clean_stats(self):
         '''Clean stats turns 'topics' and 'channels' into dictionaries'''
         stats = self.nsqd.clean_stats()
-        self.assertIsInstance(stats['data']['topics'], dict)
+        self.assertIsInstance(stats['topics'], dict)
         self.assertIsInstance(
-            stats['data']['topics'][self.topic]['channels'], dict)
+            stats['topics'][self.topic]['channels'], dict)
 
 if __name__ == '__main__':
     unittest.main()

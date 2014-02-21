@@ -26,7 +26,9 @@ def wrap(function, *args, **kwargs):
 def json_wrap(function, *args, **kwargs):
     '''Return the json content of a function that returns a request'''
     try:
-        return json.loads(function(*args, **kwargs).content)
+        # Some responses have data = None, but they generally signal a
+        # successful API call as well.
+        return json.loads(function(*args, **kwargs).content)['data'] or True
     except Exception as exc:
         raise ClientException(exc)
 

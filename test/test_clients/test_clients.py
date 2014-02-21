@@ -57,7 +57,7 @@ class TestClients(unittest.TestCase):
     def test_json_wrap_basic(self):
         '''Returns JSON-parsed content'''
         self.result.content = '{"data":"bar"}'
-        self.assertEqual(clients.json_wrap(self.function)(), {'data': 'bar'})
+        self.assertEqual(clients.json_wrap(self.function)(), 'bar')
 
     def test_json_wrap_exception(self):
         '''Raises a generalized exception for failed 200s'''

@@ -99,8 +99,8 @@ class Client(BaseClient):
     def clean_stats(self):
         '''Stats with topics and channels keyed on topic and channel names'''
         stats = self.stats()
-        if 'topics' in stats['data']:
-            topics = stats['data']['topics']
+        if 'topics' in stats:
+            topics = stats['topics']
             topics = dict((t.pop('topic_name'), t) for t in topics)
             for topic, data in topics.items():
                 if 'channels' in data:
@@ -108,5 +108,5 @@ class Client(BaseClient):
                     channels = dict(
                         (c.pop('channel_name'), c) for c in channels)
                     data['channels'] = channels
-            stats['data']['topics'] = topics
+            stats['topics'] = topics
         return stats
