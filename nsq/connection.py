@@ -8,6 +8,7 @@ from . import __version__
 import errno
 import socket
 import struct
+import sys
 
 
 class Connection(object):
@@ -33,12 +34,16 @@ class Connection(object):
         self.ready = 0
         # Whether or not we've received an identify response
         self._identify_received = False
+        self._identify_response = {}
         # The options to use when identifying
         self._identify_options = dict(identify)
         self._identify_options.setdefault('short_id', socket.gethostname())
         self._identify_options.setdefault('long_id', socket.getfqdn())
         self._identify_options.setdefault('feature_negotiation', True)
         self._identify_options.setdefault('user_agent', self.USER_AGENT)
+
+        # Some settings that may be determined by an identify response
+        self._max_rdy_count = sys.maxint
 
         # Check for any options we don't support
         disallowed = ('tls_v1', 'snappy', 'deflate', 'deflate_level')
@@ -125,6 +130,10 @@ class Connection(object):
         # inspect.
         try:
             res.data = json.loads(res.data)
+            self._identify_response = res.data
+            # Save our max ready count unless it's not provided
+            self._max_rdy_count = res.data.get(
+                'max_rdy_count', self._max_rdy_count)
         except:
             pass
         finally:

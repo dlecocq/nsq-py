@@ -384,3 +384,14 @@ class TestConnection(FakeServerTest):
         '''We should yell early about incompatible snappy and deflate options'''
         self.assertRaises(AssertionError,
             connection.Connection, 'host', 0, snappy=True, deflate=True)
+
+    def test_identify_saves_identify_response(self):
+        '''Saves the identify response from the server'''
+        expected = {'foo': 'bar'}
+        with self.identify(expected):
+            self.assertEqual(self.client._identify_response, expected)
+
+    def test_identify_saves_max_rdy_count(self):
+        '''Saves the max ready count if it's provided'''
+        with self.identify({'max_rdy_count': 100}):
+            self.assertEqual(self.client._max_rdy_count, 100)
