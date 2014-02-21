@@ -94,6 +94,13 @@ class TestReader(unittest.TestCase):
         with mock.patch.object(connection, 'ready', -1):
             self.assertTrue(self.client.needs_distribute_ready())
 
+    def test_low_ready(self):
+        '''If clients have negative RDY values, distribute_ready is invoked'''
+        connection = self.client.connections()[0]
+        with mock.patch.object(connection, 'ready', 2):
+            with mock.patch.object(connection, 'last_ready_sent', 10):
+                self.assertTrue(self.client.needs_distribute_ready())
+
     def test_none_alive(self):
         '''We don't need to redistribute RDY if there are none alive'''
         with mock.patch.object(self.client, 'connections', return_value=[]):
