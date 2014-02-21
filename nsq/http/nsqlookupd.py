@@ -15,6 +15,7 @@ class Client(BaseClient):
         '''Get info about this instance'''
         return self.get('/info')
 
+    @json_wrap
     def lookup(self, topic):
         '''Look up which hosts serve a particular topic'''
         return self.get('/lookup', params={'topic': topic})
@@ -37,7 +38,6 @@ class Client(BaseClient):
     @json_wrap
     def delete_topic(self, topic):
         '''Delete a topic'''
-        print 'Trying to delete %s' % topic
         return self.get('/delete_topic', params={'topic': topic})
 
     @json_wrap
