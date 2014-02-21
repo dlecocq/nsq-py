@@ -36,11 +36,6 @@ class Reader(Client):
         # Try to pre-empty starvation by comparing current RDY against
         # the last value sent.
         alive = [c for c in self.connections()]
-
-        # If we have no active connections, of course we can't distribute RDY
-        if not alive:
-            return False
-
         if any(c.ready <= (c.last_ready_sent * 0.25) for c in alive):
             return True
 

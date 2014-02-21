@@ -140,9 +140,10 @@ class Client(object):
         readable, writable, exceptable = select.select(
             connections, writes, connections, self._timeout)
 
-        # If we returned because the timeout interval passed, log it
+        # If we returned because the timeout interval passed, log it and return
         if not (readable or writable or exceptable):
             logger.debug('Timed out...')
+            return []
 
         responses = []
         # For each readable socket, we'll try to read some responses
