@@ -131,6 +131,9 @@ class Client(object):
         # We'll check all living connections
         connections = [c for c in self.connections() if c.alive()]
 
+        if not connections:
+            return []
+
         # Not all connections need to be written to, so we'll only concern
         # ourselves with those that require writes
         writes = [c for c in connections if c.pending()]

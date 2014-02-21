@@ -36,7 +36,12 @@ class Reader(Client):
         # Determine whether or not we need to redistribute the ready state. For
         # now, we'll just to the simple thing and say that if any of the
         # conections has a ready state of 0
-        alive = [c for c in self.connections()]
+        alive = [c for c in self.connections() if c.alive()]
+
+        # If we have no active connections, of course we can't distribute RDY
+        if not alive:
+            return False
+
         # It can happen that a connection receives more messages than we might
         # believe its RDY state to be. Consider the case where we send one RDY
         # status, messages are sent back but before we consume them, we send a

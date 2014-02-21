@@ -99,6 +99,20 @@ class TestClient(unittest.TestCase):
             self.client.read()
             connection.close.assert_called_with()
 
+    def test_connect(self):
+        '''When connecting to a server, it closes it if we can't add it'''
+        with mock.patch('nsq.client.connection') as MockConnection:
+            with mock.patch.object(self.client, 'add', return_value=None):
+                conn = mock.Mock()
+                MockConnection.Connection.return_value = conn
+                self.client.connect('host', 'port')
+                conn.close.assert_called_with()
+
+    def test_read_with_no_connections(self):
+        '''Attempting to read with no connections'''
+        with mock.patch.object(self.client, 'connections', return_value=[]):
+            self.assertEqual(self.client.read(), [])
+
 
 class TestClientNsqd(unittest.TestCase):
     '''Test our client class'''
@@ -195,8 +209,3 @@ class TestClientLookupd(unittest.TestCase):
         self.client.discover('foo')
         state = [conn.alive() for conn in self.client.connections()]
         self.assertEqual(state, [True])
-
-
-class TestReader(unittest.TestCase):
-    '''Test our Reader client class'''
-    pass

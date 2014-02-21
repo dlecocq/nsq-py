@@ -94,6 +94,11 @@ class TestReader(unittest.TestCase):
         with mock.patch.object(connection, 'ready', -1):
             self.assertTrue(self.client.needs_distribute_ready())
 
+    def test_none_alive(self):
+        '''We don't need to redistribute RDY if there are none alive'''
+        with mock.patch.object(self.client, 'connections', return_value=[]):
+            self.assertFalse(self.client.needs_distribute_ready())
+
     def test_read(self):
         '''Read checks if we need to distribute ready'''
         with mock.patch('nsq.reader.Client'):

@@ -284,7 +284,3 @@ class TestConnection(unittest.TestCase):
         self.connection.nop()
         expected = ''.join((constants.MAGIC_V2, constants.NOP, constants.NL))
         self.assertEqual(self.read(len(expected)), expected)
-
-
-if __name__ == '__main__':
-    unittest.main()
