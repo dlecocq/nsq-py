@@ -1,10 +1,10 @@
-'''A class for interacting with a nslookupd instance over http'''
+'''A class for interacting with a nsqlookupd instance over http'''
 
 from . import BaseClient, json_wrap, ok_check
 
 
 class Client(BaseClient):
-    '''A client for talking to nslookupd over http'''
+    '''A client for talking to nsqlookupd over http'''
     @ok_check
     def ping(self):
         '''Ping the client'''

@@ -172,7 +172,7 @@ class TestClientLookupd(unittest.TestCase):
             self.assertTrue(connection.alive())
 
     def test_asserts_topic(self):
-        '''If nslookupd servers are provided, asserts a topic'''
+        '''If nsqlookupd servers are provided, asserts a topic'''
         self.assertRaises(
             AssertionError, client.Client, lookupd_http_addresses=['foo'])
 
