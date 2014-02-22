@@ -30,7 +30,11 @@ class Reader(Client):
             # Distribute the ready count evenly among the connections
             for count, conn in distribute(self._max_in_flight, connections):
                 # We cannot exceed the maximum RDY count for a connection
-                count = min(conn.max_rdy_count, count)
+                if count > conn.max_rdy_count:
+                    logger.info(
+                        'Using max_rdy_count (%i) instead of %i for %s RDY',
+                        conn.max_rdy_count, count, conn)
+                    count = conn.max_rdy_count
                 logger.info('Sending RDY %i to %s', count, conn)
                 conn.rdy(count)
 
