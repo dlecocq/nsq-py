@@ -1,5 +1,6 @@
 #! /usr/bin/env python
 import sys
+from nsq import __version__
 
 extra = {}
 
@@ -12,7 +13,7 @@ except ImportError:
 
 
 setup(name               = 'nsq-py',
-    version              = '0.1.0',
+    version              = __version__,
     description          = 'NSQ for Python With Pure Sockets',
     url                  = 'http://github.com/dlecocq/nsq-py',
     author               = 'Dan Lecocq',

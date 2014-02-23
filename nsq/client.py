@@ -15,17 +15,17 @@ class Client(object):
     '''A client for talking to NSQ over a connection'''
     def __init__(self,
         lookupd_http_addresses=None, nsqd_tcp_addresses=None, topic=None,
-        timeout=0.1):
+        timeout=0.1, **identify):
         # If lookupd_http_addresses are provided, so must a topic be.
         if lookupd_http_addresses:
             assert topic
 
+        # The options to send along with identify when establishing connections
+        self._identify_options = identify
         # A mapping of (host, port) to our nsqd connection objects
         self._connections = {}
-
         # The select timeout
         self._timeout = timeout
-
         # Create clients for each of lookupd instances
         lookupd_http_addresses = lookupd_http_addresses or []
         self._lookupd = [
@@ -87,7 +87,7 @@ class Client(object):
 
     def connect(self, host, port):
         '''Connect to the provided host, port'''
-        conn = connection.Connection(host, port)
+        conn = connection.Connection(host, port, **self._identify_options)
         conn.setblocking(0)
         self.add(conn)
         return conn
@@ -140,9 +140,10 @@ class Client(object):
         readable, writable, exceptable = select.select(
             connections, writes, connections, self._timeout)
 
-        # If we returned because the timeout interval passed, log it
+        # If we returned because the timeout interval passed, log it and return
         if not (readable or writable or exceptable):
             logger.debug('Timed out...')
+            return []
 
         responses = []
         # For each readable socket, we'll try to read some responses

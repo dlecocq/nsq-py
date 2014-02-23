@@ -7,10 +7,11 @@ from . import logger
 class Reader(Client):
     '''A client meant exclusively for reading'''
     def __init__(self, topic, channel, lookupd_http_addresses=None,
-        nsqd_tcp_addresses=None, max_in_flight=200):
+        nsqd_tcp_addresses=None, max_in_flight=200, **identify):
         self._channel = channel
         self._max_in_flight = max_in_flight
-        Client.__init__(self, lookupd_http_addresses, nsqd_tcp_addresses, topic)
+        Client.__init__(
+            self, lookupd_http_addresses, nsqd_tcp_addresses, topic, **identify)
 
     def add(self, connection):
         '''Add this connection and manipulate its RDY state'''
@@ -28,6 +29,12 @@ class Reader(Client):
         else:
             # Distribute the ready count evenly among the connections
             for count, conn in distribute(self._max_in_flight, connections):
+                # We cannot exceed the maximum RDY count for a connection
+                if count > conn.max_rdy_count:
+                    logger.info(
+                        'Using max_rdy_count (%i) instead of %i for %s RDY',
+                        conn.max_rdy_count, count, conn)
+                    count = conn.max_rdy_count
                 logger.info('Sending RDY %i to %s', count, conn)
                 conn.rdy(count)
 
@@ -36,11 +43,6 @@ class Reader(Client):
         # Try to pre-empty starvation by comparing current RDY against
         # the last value sent.
         alive = [c for c in self.connections()]
-
-        # If we have no active connections, of course we can't distribute RDY
-        if not alive:
-            return False
-
         if any(c.ready <= (c.last_ready_sent * 0.25) for c in alive):
             return True
 

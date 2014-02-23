@@ -3,15 +3,20 @@ from . import logger
 from . import response
 from . import util
 from . import json
+from . import __version__
 
 import errno
 import socket
 import struct
+import sys
 
 
 class Connection(object):
     '''A socket-based connection to a NSQ server'''
-    def __init__(self, host, port, timeout=1.0):
+    # Default user agent
+    USER_AGENT = 'nsq-py/%s' % __version__
+
+    def __init__(self, host, port, timeout=1.0, **identify):
         assert isinstance(host, (str, unicode))
         assert isinstance(port, int)
         self._socket = None
@@ -24,11 +29,30 @@ class Connection(object):
         # The pending messages we have to send
         self._pending = []
         self._timeout = timeout
-        # Establish our connection
-        self.connect()
         # The last ready time we set our ready count, current ready count
         self.last_ready_sent = 0
         self.ready = 0
+        # Whether or not we've received an identify response
+        self._identify_received = False
+        self._identify_response = {}
+        # The options to use when identifying
+        self._identify_options = dict(identify)
+        self._identify_options.setdefault('short_id', socket.gethostname())
+        self._identify_options.setdefault('long_id', socket.getfqdn())
+        self._identify_options.setdefault('feature_negotiation', True)
+        self._identify_options.setdefault('user_agent', self.USER_AGENT)
+
+        # Some settings that may be determined by an identify response
+        self.max_rdy_count = sys.maxint
+
+        # Check for any options we don't support
+        disallowed = ('tls_v1', 'snappy', 'deflate', 'deflate_level')
+        for key in disallowed:
+            assert not self._identify_options.get(key, False), (
+                'Option %s is not supported' % key)
+
+        # Establish our connection
+        self.connect()
 
     def __str__(self):
         state = 'alive' if self.alive() else 'dead'
@@ -40,9 +64,15 @@ class Connection(object):
         self._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self._socket.settimeout(self._timeout)
         self._socket.connect((self.host, self.port))
-        self._socket.send(constants.MAGIC_V2)
         # Set our socket's blocking state to whatever ours is
         self._socket.setblocking(self._blocking)
+        # Safely write our magic
+        self._pending.append(constants.MAGIC_V2)
+        self.flush()
+        # And send our identify command
+        self.identify(self._identify_options)
+        # At this point, we've not received an identify response
+        self._identify_received = False
 
     def close(self):
         '''Close our connection'''
@@ -84,11 +114,32 @@ class Connection(object):
                 res = response.Response.from_raw(self, message)
                 if isinstance(res, response.Message):
                     self.ready -= 1
+                elif not self._identify_received:
+                    # Handle the identify response if we've not yet received it
+                    if isinstance(res, response.Response):  # pragma: no branch
+                        res = self.identified(res)
                 responses.append(res)
                 self._buffer = self._buffer[(size + 4):]
             else:
                 break
         return responses
+
+    def identified(self, res):
+        '''Handle a response to our 'identify' command. Returns response'''
+        # If they support it, they should give us a JSON blob which we should
+        # inspect.
+        try:
+            res.data = json.loads(res.data)
+            self._identify_response = res.data
+            # Save our max ready count unless it's not provided
+            self.max_rdy_count = res.data.get(
+                'max_rdy_count', self.max_rdy_count)
+        except:
+            pass
+        finally:
+            # Always mark that we've now handled the receive
+            self._identify_received = True
+        return res
 
     def alive(self):
         '''Returns True if this connection is alive'''
