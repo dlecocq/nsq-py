@@ -4,6 +4,7 @@ from . import response
 from . import util
 from . import json
 from . import __version__
+from .sockets import TLSSocket, SnappySocket, DeflateSocket
 
 import errno
 import socket
@@ -46,7 +47,13 @@ class Connection(object):
         self.max_rdy_count = sys.maxint
 
         # Check for any options we don't support
-        disallowed = ('tls_v1', 'snappy', 'deflate', 'deflate_level')
+        disallowed = []
+        if not SnappySocket:  # pragma: no branch
+            disallowed.append('snappy')
+        if not DeflateSocket:  # pragma: no branch
+            disallowed.extend(['deflate', 'deflate_level'])
+        if not TLSSocket:  # pragma: no branch
+            disallowed.append('tls_v1')
         for key in disallowed:
             assert not self._identify_options.get(key, False), (
                 'Option %s is not supported' % key)
