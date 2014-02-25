@@ -10,7 +10,8 @@ from nsq import connection
 from nsq import constants
 from nsq import response
 from nsq import util
-from common import FakeServerTest
+from nsq import sockets
+from common import FakeServerTest, IntegrationTest
 
 
 class TestConnection(FakeServerTest):
@@ -360,25 +361,29 @@ class TestConnection(FakeServerTest):
             conn = connection.Connection('host', 0, long_id='not-your-fqdn')
             self.assertEqual(conn._identify_options['long_id'], 'not-your-fqdn')
 
-    def test_identify_no_tls(self):
+    def test_identify_tls_unsupported(self):
         '''Raises an exception about the lack of TLS support'''
-        self.assertRaises(
-            AssertionError, connection.Connection, 'host', 0, tls_v1=True)
+        with mock.patch('nsq.connection.TLSSocket', None):
+            self.assertRaises(
+                AssertionError, connection.Connection, 'host', 0, tls_v1=True)
 
-    def test_identify_no_snappy(self):
+    def test_identify_snappy_unsupported(self):
         '''Raises an exception about the lack of snappy support'''
-        self.assertRaises(
-            AssertionError, connection.Connection, 'host', 0, snappy=True)
+        with mock.patch('nsq.connection.SnappySocket', None):
+            self.assertRaises(
+                AssertionError, connection.Connection, 'host', 0, snappy=True)
 
-    def test_identify_no_deflate(self):
+    def test_identify_deflate_unsupported(self):
         '''Raises an exception about the lack of deflate support'''
-        self.assertRaises(
-            AssertionError, connection.Connection, 'host', 0, deflate=True)
+        with mock.patch('nsq.connection.DeflateSocket', None):
+            self.assertRaises(
+                AssertionError, connection.Connection, 'host', 0, deflate=True)
 
     def test_identify_no_deflate_level(self):
-        '''Raises an exception about the lack of deflat_level support'''
-        self.assertRaises(AssertionError,
-            connection.Connection, 'host', 0, deflate_level=True)
+        '''Raises an exception about the lack of deflate_level support'''
+        with mock.patch('nsq.connection.DeflateSocket', None):
+            self.assertRaises(AssertionError,
+                connection.Connection, 'host', 0, deflate_level=True)
 
     def test_identify_no_snappy_and_deflate(self):
         '''We should yell early about incompatible snappy and deflate options'''
