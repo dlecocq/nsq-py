@@ -15,22 +15,26 @@ class Client(object):
     '''A client for talking to NSQ over a connection'''
     def __init__(self,
         lookupd_http_addresses=None, nsqd_tcp_addresses=None, topic=None,
-        timeout=0.1, **identify):
+        timeout=0.1, reconnection_backoff=None, **identify):
         # If lookupd_http_addresses are provided, so must a topic be.
         if lookupd_http_addresses:
             assert topic
 
-        # The options to send along with identify when establishing connections
-        self._identify_options = identify
-        # A mapping of (host, port) to our nsqd connection objects
-        self._connections = {}
-        # The select timeout
-        self._timeout = timeout
         # Create clients for each of lookupd instances
         lookupd_http_addresses = lookupd_http_addresses or []
         self._lookupd = [
             nsqlookupd.Client(host) for host in lookupd_http_addresses]
         self._topic = topic
+
+        # The select timeout
+        self._timeout = timeout
+        # Our reconnection backoff policy
+        self._reconnection_backoff = reconnection_backoff
+
+        # The options to send along with identify when establishing connections
+        self._identify_options = identify
+        # A mapping of (host, port) to our nsqd connection objects
+        self._connections = {}
 
         self._nsqd_tcp_addresses = nsqd_tcp_addresses or []
         # A lock for manipulating our connections
@@ -83,7 +87,8 @@ class Client(object):
                 # If we've connected to it before, but it's no longer alive,
                 # we'll have to make a decision about when to try to reconnect
                 # to it, if we need to reconnect to it at all
-                pass
+                if conn.ready_to_reconnect():
+                    conn.connect()
 
     def connect(self, host, port):
         '''Connect to the provided host, port'''
