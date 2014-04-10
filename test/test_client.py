@@ -201,5 +201,50 @@ class TestClientMultiple(FakeServerTest):
             with mock.patch.object(self.client, 'connections', return_value=[]):
                 self.assertEqual(self.client.read(), [])
 
+    def test_random_connection(self):
+        '''Yields a random client'''
+        found = []
+        for _ in xrange(20):
+            with self.client.random_connection() as conn:
+                found.append(conn)
+        self.assertEqual(set(found), set(self.client.connections()))
+
+    def test_wait_response(self):
+        '''Waits until a response is available'''
+        with mock.patch.object(
+            self.client, 'read', side_effect=[[], ['hello']]):
+            self.assertEqual(self.client.wait_response(), ['hello'])
+
+    def test_wait_write(self):
+        '''Waits until a command has been sent'''
+        connection = mock.Mock()
+        with mock.patch.object(self.client, 'read'):
+            connection.pending = mock.Mock(side_effect=[True, False])
+            self.client.wait_write(connection)
+            self.assertTrue(connection.pending.called)
+
+    def test_pub(self):
+        '''Pub called on a random connection and waits for a response'''
+        connection = mock.Mock()
+        with mock.patch.object(
+            self.client, 'connections', return_value=[connection]):
+            with mock.patch.object(
+                self.client, 'wait_response', return_value=['response']):
+                self.assertEqual(self.client.pub('foo', 'bar'), ['response'])
+                connection.pub.assert_called_with('foo', 'bar')
+
+    def test_mpub(self):
+        '''Mpub called on a random connection and waits for a response'''
+        connection = mock.Mock()
+        messages = ['hello', 'how', 'are', 'you']
+        with mock.patch.object(
+            self.client, 'connections', return_value=[connection]):
+            with mock.patch.object(
+                self.client, 'wait_response', return_value=['response']):
+                self.assertEqual(
+                    self.client.mpub('foo', messages), ['response'])
+                connection.mpub.assert_called_with('foo', messages)
+
+
 if __name__ == '__main__':
     unittest.main()
