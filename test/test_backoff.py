@@ -73,6 +73,23 @@ class TestExponential(unittest.TestCase):
         self.assertEqual(one.backoff(2) * 4, two.backoff(2))
 
 
+class TestClamped(unittest.TestCase):
+    '''Does in fact keep our backoff clamped'''
+    def setUp(self):
+        self.linear = backoff.Linear(1, 2)
+        self.backoff = backoff.Clamped(self.linear, minimum=5, maximum=10)
+
+    def test_min(self):
+        '''Asserts a minimum'''
+        self.assertLess(self.linear.backoff(0), 5)
+        self.assertEqual(self.backoff.backoff(0), 5)
+
+    def test_max(self):
+        '''Asserts a maximum'''
+        self.assertGreater(self.linear.backoff(100), 10)
+        self.assertEqual(self.backoff.backoff(100), 10)
+
+
 class TestAttemptCounter(unittest.TestCase):
     '''Test the attempt counter'''
     def setUp(self):
@@ -93,10 +110,6 @@ class TestAttemptCounter(unittest.TestCase):
             self.assertEqual(
                 self.counter.backoff(), self.backoff.backoff.return_value)
             self.backoff.backoff.assert_called_with(5)
-
-    def test_success(self):
-        '''Success not implemented on the base class'''
-        self.assertRaises(NotImplementedError, self.counter.success)
 
     def test_failed(self):
         '''Failed increments the number of attempts'''

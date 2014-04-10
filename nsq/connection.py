@@ -1,3 +1,4 @@
+from . import backoff
 from . import constants
 from . import logger
 from . import response
@@ -17,7 +18,8 @@ class Connection(object):
     # Default user agent
     USER_AGENT = 'nsq-py/%s' % __version__
 
-    def __init__(self, host, port, timeout=1.0, **identify):
+    def __init__(self, host, port, timeout=1.0, reconnection_backoff=None,
+        **identify):
         assert isinstance(host, (str, unicode))
         assert isinstance(port, int)
         self._socket = None
@@ -58,6 +60,14 @@ class Connection(object):
             assert not self._identify_options.get(key, False), (
                 'Option %s is not supported' % key)
 
+        # Our backoff policy for reconnection. The default is to use an
+        # exponential backoff 8 * (2 ** attempt) clamped to [0, 60]
+        self._reconnection_backoff = (
+            reconnection_backoff or
+            backoff.Clamped(backoff.Exponential(2, 8), maximum=60))
+        self._reconnnection_counter = backoff.ResettingAttemptCounter(
+            self._reconnection_backoff)
+
         # Establish our connection
         self.connect()
 
@@ -65,6 +75,10 @@ class Connection(object):
         state = 'alive' if self.alive() else 'dead'
         return '<Connection %s:%s (%s on FD %s)>' % (
             self.host, self.port, state, self.fileno())
+
+    def ready_to_reconnect(self):
+        '''Returns True if enough time has passed to attempt a reconnection'''
+        return self._reconnnection_counter.ready()
 
     def connect(self):
         '''Establish a connection'''
