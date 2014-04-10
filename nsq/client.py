@@ -7,6 +7,8 @@ from .constants import HEARTBEAT
 from .response import Response, Error
 from .http import nsqlookupd, ClientException
 
+from contextlib import contextmanager
+import random
 import select
 import threading
 
@@ -187,3 +189,36 @@ class Client(object):
             self.close_connection(conn)
 
         return responses
+
+    @contextmanager
+    def random_connection(self):
+        '''Pick a random living connection'''
+        # While at the moment there's no need for this to be a context manager
+        # per se, I would like to use that interface since I anticipate
+        # adding some wrapping around it at some point.
+        yield random.choice(
+            [conn for conn in self.connections() if conn.alive()])
+
+    def wait_response(self):
+        '''Wait for a response'''
+        responses = self.read()
+        while not responses:
+            responses = self.read()
+        return responses
+
+    def wait_write(self, client):
+        '''Wait until the specific client has written the message'''
+        while client.pending():
+            self.read()
+
+    def pub(self, topic, message):
+        '''Publish the provided message to the provided topic'''
+        with self.random_connection() as client:
+            client.pub(topic, message)
+            return self.wait_response()
+
+    def mpub(self, topic, messages):
+        '''Publish messages to a topic'''
+        with self.random_connection() as client:
+            client.mpub(topic, messages)
+            return self.wait_response()
