@@ -44,7 +44,14 @@ class TestClientNsqd(FakeServerTest):
             with mock.patch.object(
                 self.client, '_identify_options', {'foo': 'bar'}):
                 self.client.connect('foo', 'bar')
-                MockConnection.assert_called_with('foo', 'bar', foo='bar')
+                MockConnection.assert_called_with('foo', 'bar',
+                    reconnection_backoff=None, foo='bar')
+
+    def test_conection_checker(self):
+        '''Spawns and starts a connection checker'''
+        with self.client.connection_checker() as checker:
+            self.assertTrue(checker.is_alive())
+        self.assertFalse(checker.is_alive())
 
 
 class TestClientLookupd(FakeServerTest):

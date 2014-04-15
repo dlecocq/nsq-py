@@ -63,10 +63,11 @@ class Reader(Client):
         return found
 
     def __iter__(self):
-        while True:
-            for message in self.read():
-                # A reader's only interested in actual messages
-                if isinstance(message, Message):
-                    # We'll probably add a hook in here to track the RDY states
-                    # of our connections
-                    yield message
+        with self.connection_checker():
+            while True:
+                for message in self.read():
+                    # A reader's only interested in actual messages
+                    if isinstance(message, Message):
+                        # We'll probably add a hook in here to track the RDY
+                        # states of our connections
+                        yield message

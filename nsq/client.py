@@ -6,6 +6,7 @@ from . import exceptions
 from .constants import HEARTBEAT
 from .response import Response, Error
 from .http import nsqlookupd, ClientException
+from .checker import ConnectionChecker
 
 from contextlib import contextmanager
 import random
@@ -92,9 +93,22 @@ class Client(object):
                 if conn.ready_to_reconnect():
                     conn.connect()
 
+    @contextmanager
+    def connection_checker(self):
+        '''Run periodic reconnection checks'''
+        thread = ConnectionChecker(self)
+        thread.start()
+        try:
+            yield thread
+        finally:
+            thread.stop()
+            thread.join()
+
     def connect(self, host, port):
         '''Connect to the provided host, port'''
-        conn = connection.Connection(host, port, **self._identify_options)
+        conn = connection.Connection(host, port,
+            reconnection_backoff=self._reconnection_backoff,
+            **self._identify_options)
         conn.setblocking(0)
         self.add(conn)
         return conn
