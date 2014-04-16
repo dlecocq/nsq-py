@@ -16,7 +16,7 @@ class Reader(Client):
     def add(self, connection):
         '''Add this connection and manipulate its RDY state'''
         conn = Client.add(self, connection)
-        if conn:
+        if conn and conn.alive():
             conn.sub(self._topic, self._channel)
             conn.rdy(1)
 

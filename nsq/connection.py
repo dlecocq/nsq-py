@@ -82,18 +82,33 @@ class Connection(object):
 
     def connect(self):
         '''Establish a connection'''
-        self._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self._socket.settimeout(self._timeout)
-        self._socket.connect((self.host, self.port))
-        # Set our socket's blocking state to whatever ours is
-        self._socket.setblocking(self._blocking)
-        # Safely write our magic
-        self._pending.append(constants.MAGIC_V2)
-        self.flush()
-        # And send our identify command
-        self.identify(self._identify_options)
-        # At this point, we've not received an identify response
-        self._identify_received = False
+        # Don't re-establish existing connections
+        if self.alive():
+            return True
+
+        # Otherwise, try to connect
+        try:
+            self._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self._socket.settimeout(self._timeout)
+            self._socket.connect((self.host, self.port))
+            # Set our socket's blocking state to whatever ours is
+            self._socket.setblocking(self._blocking)
+            # Safely write our magic
+            self._pending.append(constants.MAGIC_V2)
+            self.flush()
+            # And send our identify command
+            self.identify(self._identify_options)
+            # At this point, we've not received an identify response
+            self._identify_received = False
+            self._reconnnection_counter.success()
+            return True
+        except:
+            logger.exception('Failed to connect')
+            if self._socket:
+                self._socket.close()
+            self._socket = None
+            self._reconnnection_counter.failed()
+            return False
 
     def close(self):
         '''Close our connection'''

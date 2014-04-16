@@ -10,8 +10,7 @@ from nsq import connection
 from nsq import constants
 from nsq import response
 from nsq import util
-from nsq import sockets
-from common import FakeServerTest, IntegrationTest
+from common import FakeServerTest
 
 
 class TestConnection(FakeServerTest):
@@ -400,3 +399,22 @@ class TestConnection(FakeServerTest):
         '''Saves the max ready count if it's provided'''
         with self.identify({'max_rdy_count': 100}):
             self.assertEqual(self.client.max_rdy_count, 100)
+
+    def test_ready_to_reconnect(self):
+        '''Alias for the reconnection attempt's ready method'''
+        with mock.patch.object(self.client, '_reconnnection_counter') as ctr:
+            self.client.ready_to_reconnect()
+            ctr.ready.assert_called_with()
+
+    def test_reconnect_living_socket(self):
+        '''Don't reconnect a living connection'''
+        before = self.client._socket
+        self.client.connect()
+        self.assertEqual(self.client._socket, before)
+
+    def test_connect_socket_error_return_value(self):
+        '''Socket errors has connect return False'''
+        self.client.close()
+        with mock.patch('nsq.connection.socket') as mock_socket:
+            mock_socket.socket = mock.Mock(side_effect=socket.error)
+            self.assertFalse(self.client.connect())

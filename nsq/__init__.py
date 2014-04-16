@@ -16,4 +16,4 @@ except ImportError:  # pragma: no cover
     import json
 
 # The current version
-__version__ = '0.1.1'
+__version__ = '0.1.2'
