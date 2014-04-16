@@ -91,7 +91,8 @@ class Client(object):
                 # we'll have to make a decision about when to try to reconnect
                 # to it, if we need to reconnect to it at all
                 if conn.ready_to_reconnect():
-                    conn.connect()
+                    if conn.connect():
+                        conn.setblocking(0)
 
     @contextmanager
     def connection_checker(self):
@@ -109,7 +110,8 @@ class Client(object):
         conn = connection.Connection(host, port,
             reconnection_backoff=self._reconnection_backoff,
             **self._identify_options)
-        conn.setblocking(0)
+        if conn.alive():
+            conn.setblocking(0)
         self.add(conn)
         return conn
 

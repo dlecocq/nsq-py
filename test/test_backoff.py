@@ -117,6 +117,26 @@ class TestAttemptCounter(unittest.TestCase):
             self.assertEqual(self.counter.attempts, attempts)
             self.counter.failed()
 
+    def test_ready_false(self):
+        '''Ready returns false if not enough time has elapsed'''
+        with mock.patch('nsq.backoff.time') as mock_time:
+            mock_time.time = mock.Mock(return_value=10)
+            with mock.patch.object(self.counter, '_last_failed', 10):
+                self.assertFalse(self.counter.ready())
+
+    def test_ready_true(self):
+        '''Ready returns true if enough time has elapsed'''
+        with mock.patch('nsq.backoff.time') as mock_time:
+            mock_time.time = mock.Mock(return_value=10)
+            with mock.patch.object(self.counter, '_last_failed', 1):
+                with mock.patch.object(self.counter, 'backoff', return_value=5):
+                    self.assertTrue(self.counter.ready())
+
+    def test_ready_never_failed(self):
+        '''If it has never failed, then it returns True'''
+        with mock.patch.object(self.counter, '_last_failed', None):
+            self.assertTrue(self.counter.ready())
+
 
 class TestResettingAttemptCounter(unittest.TestCase):
     '''Test the ResettingAttemptCounter'''
