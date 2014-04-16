@@ -4,6 +4,8 @@ import struct
 from . import constants
 from . import exceptions
 
+from contextlib import contextmanager
+
 
 class Response(object):
     '''A response from NSQ'''
@@ -52,7 +54,7 @@ class Message(Response):
     format = '>qH16s'
     size = struct.calcsize(format)
 
-    __slots__ = ('timestamp', 'attempts', 'id', 'body')
+    __slots__ = ('timestamp', 'attempts', 'id', 'body', 'processed')
 
     @classmethod
     def pack(cls, timestamp, attempts, _id, data):
@@ -69,6 +71,7 @@ class Message(Response):
         self.timestamp, self.attempts, self.id = struct.unpack(
             self.format, data[:self.size])
         self.body = data[self.size:]
+        self.processed = False
 
     def __str__(self):
         return '%s - %i %i %s %s' % (
@@ -81,14 +84,34 @@ class Message(Response):
     def fin(self):
         '''Indicate that this message is finished processing'''
         self.connection.fin(self.id)
+        self.processed = True
 
     def req(self, timeout):
         '''Re-queue a message'''
         self.connection.req(self.id, timeout)
+        self.processed = True
 
     def touch(self):
         '''Reset the timeout for an in-flight message'''
         self.connection.touch(self.id)
+
+    def delay(self):
+        '''How long to delay its requeueing'''
+        return 60
+
+    @contextmanager
+    def handle(self):
+        '''Make sure this message gets either 'fin' or 'req'd'''
+        try:
+            yield self
+        except:
+            # Requeue the message and raise the original exception
+            if not self.processed:
+                self.req(self.delay())
+            raise
+        else:
+            if not self.processed:
+                self.fin()
 
 
 class Error(Response):

@@ -148,3 +148,40 @@ class TestMessage(unittest.TestCase):
         self.assertEqual(unpacked.attempts, self.attempt)
         self.assertEqual(unpacked.id, self.id)
         self.assertEqual(unpacked.body, self.body)
+
+    def test_handle_yields(self):
+        '''The handle method should yield the message'''
+        with self.response.handle() as msg:
+            self.assertEqual(msg, self.response)
+
+    def test_handle_exception(self):
+        '''Handles exceptions by requeueing'''
+        try:
+            with self.response.handle():
+                raise ValueError('foo')
+        except ValueError:
+            self.response.connection.req.assert_called_with(
+                self.response.id, self.response.delay())
+        else:
+            self.assertTrue(False, 'No exception was raised')
+
+    def test_handle_success(self):
+        '''Handles success by calling fin'''
+        with self.response.handle():
+            pass
+        self.response.connection.fin.assert_called_with(self.response.id)
+
+    def test_handle_already_requeued(self):
+        '''If we've already requeued a message, doesn't requeue it again'''
+        try:
+            with self.response.handle():
+                self.response.req(10)
+                raise ValueError('foo')
+        except ValueError:
+            self.assertEqual(self.response.connection.req.call_count, 1)
+
+    def test_handle_already_finish(self):
+        '''If we've already finished a messages, doesn't finish it again'''
+        with self.response.handle():
+            self.response.fin()
+        self.assertEqual(self.response.connection.fin.call_count, 1)
