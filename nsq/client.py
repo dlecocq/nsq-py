@@ -11,6 +11,7 @@ from .checker import ConnectionChecker
 from contextlib import contextmanager
 import random
 import select
+import socket
 import threading
 
 
@@ -192,6 +193,9 @@ class Client(object):
                             self.close_connection(conn)
                     responses.append(res)
             except exceptions.NSQException:
+                logger.exception('Failed to read from %s', conn)
+                self.close_connection(conn)
+            except socket.error:
                 logger.exception('Failed to read from %s', conn)
                 self.close_connection(conn)
 
