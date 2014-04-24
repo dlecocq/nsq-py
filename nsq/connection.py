@@ -7,7 +7,6 @@ from . import json
 from . import __version__
 from .sockets import TLSSocket, SnappySocket, DeflateSocket
 
-from contextlib import contextmanager
 import errno
 import socket
 import struct
@@ -126,9 +125,9 @@ class Connection(object):
             finally:
                 self._socket = None
 
-    @contextmanager
     def socket(self, blocking=True):
         '''Blockingly yield the socket'''
+        # If the socket is available, then yield it. Otherwise, yield nothing
         if self._socket_lock.acquire(blocking):
             try:
                 yield self._socket
@@ -140,7 +139,7 @@ class Connection(object):
         # It's important to know that it may return no responses or multiple
         # responses. It depends on how the buffering works out. First, read from
         # the socket
-        with self.socket() as sock:
+        for sock in self.socket():
             try:
                 packet = sock.recv(4096)
             except socket.timeout:
@@ -201,13 +200,13 @@ class Connection(object):
 
     def setblocking(self, blocking):
         '''Set whether or not this message is blocking'''
-        with self.socket() as sock:
+        for sock in self.socket():
             sock.setblocking(blocking)
             self._blocking = blocking
 
     def fileno(self):
         '''Returns the socket's fileno. This allows us to select on this'''
-        with self.socket() as sock:
+        for sock in self.socket():
             return sock.fileno()
 
     def pending(self):
@@ -222,7 +221,7 @@ class Connection(object):
         # around a single string of the data that remains to be sent so that we
         # could potentially send larger messages
         total = 0
-        with self.socket(blocking=False) as sock:
+        for sock in self.socket(blocking=False):
             while self._pending:
                 try:
                     # Try to send as much of the first message as possible
@@ -250,7 +249,7 @@ class Connection(object):
         else:
             joined = command + constants.NL
         if self._blocking:
-            with self.socket() as sock:
+            for sock in self.socket():
                 sock.sendall(joined)
         else:
             self._pending.append(joined)
