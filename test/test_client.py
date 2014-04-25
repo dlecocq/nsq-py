@@ -8,6 +8,8 @@ from nsq import exceptions
 from nsq.http import ClientException
 
 from common import FakeServerTest
+from contextlib import contextmanager
+import socket
 
 
 class TestClientNsqd(FakeServerTest):
@@ -24,6 +26,13 @@ class TestClientNsqd(FakeServerTest):
             self.assertEqual(len(connections), 1)
             for connection in connections:
                 self.assertTrue(connection.alive())
+
+    def test_add_added(self):
+        '''Connect invokes self.connected'''
+        connection = mock.Mock()
+        with mock.patch.object(self.client, 'added'):
+            self.client.add(connection)
+            self.client.added.assert_called_with(connection)
 
     def test_add_existing(self):
         '''Adding an existing connection returns None'''
@@ -175,6 +184,18 @@ class TestClientMultiple(FakeServerTest):
                 self.client.read()
                 self.assertFalse(connection.alive())
 
+    def test_closes_on_socket_error(self):
+        '''If a connection gets a socket error, it closes it'''
+        # Pick a connection to have throw an exception
+        with self.identify():
+            connection = self.client.connections()[0]
+            with mock.patch.object(
+                connection, 'read', side_effect=socket.error):
+                self.servers[0].response('hello')
+                self.servers[1].response('hello')
+                self.client.read()
+                self.assertFalse(connection.alive())
+
     def test_read_writable(self):
         '''Read flushes any writable connections'''
         with self.identify():
@@ -251,6 +272,54 @@ class TestClientMultiple(FakeServerTest):
                 self.assertEqual(
                     self.client.mpub('foo', messages), ['response'])
                 connection.mpub.assert_called_with('foo', messages)
+
+
+class TestClientNsqdReconnection(FakeServerTest):
+    '''Test our client class'''
+    def connect(self):
+        '''Return a new client'''
+        hosts = ['localhost:%s' % port for port in self.ports]
+        return client.Client(nsqd_tcp_addresses=hosts)
+
+    @contextmanager
+    def mocked_dead_connection(self):
+        '''Yields the sole mocked connection of the client'''
+        conn = mock.Mock()
+        with mock.patch.object(self.client, '_connections') as mock_connections:
+            mock_connections.get.return_value = conn
+            conn.alive.return_value = False
+            yield conn
+
+    def test_not_ready_to_reconnect(self):
+        '''Does not try to reconnect connections that are not ready'''
+        with self.mocked_dead_connection() as conn:
+            conn.ready_to_reconnect.return_value = False
+            self.client.check_connections()
+            self.assertFalse(conn.connect.called)
+
+    def test_ready_to_reconnect(self):
+        '''Tries to reconnect when ready'''
+        with self.mocked_dead_connection() as conn:
+            conn.ready_to_reconnect.return_value = True
+            self.client.check_connections()
+            conn.connect.assert_called_with()
+
+    def test_set_blocking(self):
+        '''Sets blocking to 0 when reconnecting'''
+        with self.mocked_dead_connection() as conn:
+            conn.ready_to_reconnect.return_value = True
+            conn.connect.return_value = True
+            self.client.check_connections()
+            conn.setblocking.assert_called_with(0)
+
+    def test_calls_reconnected(self):
+        '''Sets blocking to 0 when reconnecting'''
+        with self.mocked_dead_connection() as conn:
+            conn.ready_to_reconnect.return_value = True
+            conn.connect.return_value = True
+            with mock.patch.object(self.client, 'reconnected'):
+                self.client.check_connections()
+                self.client.reconnected.assert_called_with(conn)
 
 
 if __name__ == '__main__':
