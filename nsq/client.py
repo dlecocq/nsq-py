@@ -212,7 +212,11 @@ class Client(object):
 
         # For each writable socket, flush some data out
         for conn in writable:
-            conn.flush()
+            try:
+                conn.flush()
+            except socket.error:
+                logger.exception('Failed to flush %s', conn)
+                self.close_connection(conn)
 
         # For each connection with an exception, try to close it and remove it
         # from our connections

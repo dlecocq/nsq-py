@@ -184,7 +184,7 @@ class TestClientMultiple(FakeServerTest):
                 self.client.read()
                 self.assertFalse(connection.alive())
 
-    def test_closes_on_socket_error(self):
+    def test_closes_on_read_socket_error(self):
         '''If a connection gets a socket error, it closes it'''
         # Pick a connection to have throw an exception
         with self.identify():
@@ -195,6 +195,18 @@ class TestClientMultiple(FakeServerTest):
                 self.servers[1].response('hello')
                 self.client.read()
                 self.assertFalse(connection.alive())
+
+    def test_closes_on_flush_socket_error(self):
+        '''If a connection fails to flush, it gets closed'''
+        # Pick a connection to have throw an exception
+        with self.identify():
+            connection = self.client.connections()[0]
+            with mock.patch.object(
+                connection, 'flush', side_effect=socket.error):
+                with mock.patch.object(
+                    connection, 'pending', return_value=True):
+                    self.client.read()
+                    self.assertFalse(connection.alive())
 
     def test_read_writable(self):
         '''Read flushes any writable connections'''
