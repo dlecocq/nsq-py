@@ -2,6 +2,7 @@
 
 import time
 import threading
+from . import logger
 
 
 class StoppableThread(threading.Thread):
@@ -12,6 +13,7 @@ class StoppableThread(threading.Thread):
 
     def wait(self, timeout):
         '''Wait for the provided time to elapse'''
+        logger.debug('Waiting for %fs', timeout)
         return self._event.wait(timeout)
 
     def stop(self):
@@ -43,7 +45,11 @@ class PeriodicThread(StoppableThread):
     def run(self):
         '''Run the callback periodically'''
         while not self.wait(self.delay()):
-            self.callback()
+            try:
+                logger.info('Invoking callback %s', self.callback)
+                self.callback()
+            except StandardError:
+                logger.exception('Callback failed')
 
 
 class ConnectionChecker(PeriodicThread):

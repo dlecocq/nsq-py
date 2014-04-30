@@ -2,6 +2,7 @@ import unittest
 
 import mock
 import uuid
+import socket
 import struct
 from nsq import response
 from nsq import constants
@@ -185,3 +186,23 @@ class TestMessage(unittest.TestCase):
         with self.response.handle():
             self.response.fin()
         self.assertEqual(self.response.connection.fin.call_count, 1)
+
+    def test_handle_exception_socket_error(self):
+        '''Handles socket errors when catching exceptions'''
+        try:
+            self.response.connection.req = mock.Mock(side_effect=socket.error)
+            with self.response.handle():
+                raise ValueError('foo')
+        except ValueError:
+            # The connection should have been closed
+            self.response.connection.close.assert_called_with()
+
+    def test_handle_success_socket_error(self):
+        '''Handles socket errors when trying to complete the message'''
+        try:
+            self.response.connection.fin = mock.Mock(side_effect=socket.error)
+            with self.response.handle():
+                pass
+        except ValueError:
+            # The connection should have been closed
+            self.response.connection.close.assert_called_with()

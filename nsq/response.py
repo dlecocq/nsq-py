@@ -5,6 +5,8 @@ from . import constants
 from . import exceptions
 
 from contextlib import contextmanager
+import socket
+import sys
 
 
 class Response(object):
@@ -106,12 +108,19 @@ class Message(Response):
             yield self
         except:
             # Requeue the message and raise the original exception
+            typ, value, trace = sys.exc_info()
             if not self.processed:
-                self.req(self.delay())
-            raise
+                try:
+                    self.req(self.delay())
+                except socket.error:
+                    self.connection.close()
+            raise typ, value, trace
         else:
             if not self.processed:
-                self.fin()
+                try:
+                    self.fin()
+                except socket.error:
+                    self.connection.close()
 
 
 class Error(Response):

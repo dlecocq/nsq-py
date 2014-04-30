@@ -22,20 +22,21 @@ class TestReader(FakeServerTest):
 
     def test_it_subscribes(self):
         '''It subscribes for newly-established connections'''
-        with mock.patch.object(self.client, 'distribute_ready'):
-            with mock.patch('nsq.reader.Client') as MockClient:
-                MockClient.add.return_value = mock.Mock()
-                self.client.add(None)
-                MockClient.add.return_value.sub.assert_called_with(
-                    self.topic, self.channel)
+        connection = mock.Mock()
+        self.client.added(connection)
+        connection.sub.assert_called_with(self.topic, self.channel)
 
     def test_new_connections_rdy(self):
         '''Calls rdy(1) when connections are added'''
         connection = mock.Mock()
-        with mock.patch('nsq.reader.Client') as MockClient:
-            MockClient.add.return_value = connection
-            self.client.add(connection)
-            connection.rdy.assert_called_with(1)
+        self.client.added(connection)
+        connection.rdy.assert_called_with(1)
+
+    def test_reconnected_rdy(self):
+        '''Calls rdy(1) when connections are reestablished'''
+        connection = mock.Mock()
+        self.client.reconnected(connection)
+        connection.rdy.assert_called_with(1)
 
     def test_it_checks_max_in_flight(self):
         '''Raises an exception if more connections than in-flight limit'''
@@ -63,15 +64,6 @@ class TestReader(FakeServerTest):
             self.client.distribute_ready()
             self.assertTrue(alive.rdy.called)
             self.assertFalse(dead.rdy.called)
-
-    def test_it_honors_Client_add(self):
-        '''If the parent client doesn't add a connection, it ignores it'''
-        with mock.patch('nsq.reader.Client') as MockClient:
-            with mock.patch.object(
-                self.client, 'distribute_ready') as mock_distribute:
-                MockClient.add.return_value = None
-                self.client.add(None)
-                self.assertFalse(mock_distribute.called)
 
     def test_zero_ready(self):
         '''When a connection has ready=0, distribute_ready is invoked'''

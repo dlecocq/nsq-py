@@ -11,6 +11,7 @@ import errno
 import socket
 import struct
 import sys
+import threading
 
 
 class Connection(object):
@@ -68,6 +69,9 @@ class Connection(object):
         self._reconnnection_counter = backoff.ResettingAttemptCounter(
             self._reconnection_backoff)
 
+        # A lock around our socket
+        self._socket_lock = threading.RLock()
+
         # Establish our connection
         self.connect()
 
@@ -87,78 +91,91 @@ class Connection(object):
             return True
 
         # Otherwise, try to connect
-        try:
-            self._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            self._socket.settimeout(self._timeout)
-            self._socket.connect((self.host, self.port))
-            # Set our socket's blocking state to whatever ours is
-            self._socket.setblocking(self._blocking)
-            # Safely write our magic
-            self._pending.append(constants.MAGIC_V2)
-            self.flush()
-            # And send our identify command
-            self.identify(self._identify_options)
-            # At this point, we've not received an identify response
-            self._identify_received = False
-            self._reconnnection_counter.success()
-            return True
-        except:
-            logger.exception('Failed to connect')
-            if self._socket:
-                self._socket.close()
-            self._socket = None
-            self._reconnnection_counter.failed()
-            return False
+        with self._socket_lock:
+            try:
+                self._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                self._socket.settimeout(self._timeout)
+                self._socket.connect((self.host, self.port))
+                # Set our socket's blocking state to whatever ours is
+                self._socket.setblocking(self._blocking)
+                # Safely write our magic
+                self._pending = []
+                self._pending.append(constants.MAGIC_V2)
+                self.flush()
+                # And send our identify command
+                self.identify(self._identify_options)
+                # At this point, we've not received an identify response
+                self._identify_received = False
+                self._reconnnection_counter.success()
+                return True
+            except:
+                logger.exception('Failed to connect')
+                if self._socket:
+                    self._socket.close()
+                self._socket = None
+                self._reconnnection_counter.failed()
+                return False
 
     def close(self):
         '''Close our connection'''
-        try:
-            if self._socket:
-                self._socket.close()
-        finally:
-            self._socket = None
+        with self._socket_lock:
+            try:
+                if self._socket:
+                    self._socket.close()
+            finally:
+                self._socket = None
+
+    def socket(self, blocking=True):
+        '''Blockingly yield the socket'''
+        # If the socket is available, then yield it. Otherwise, yield nothing
+        if self._socket_lock.acquire(blocking):
+            try:
+                yield self._socket
+            finally:
+                self._socket_lock.release()
 
     def read(self):
         '''Read from the socket, and return a list of responses'''
         # It's important to know that it may return no responses or multiple
         # responses. It depends on how the buffering works out. First, read from
         # the socket
-        try:
-            packet = self._socket.recv(4096)
-        except socket.timeout:
-            # If the socket times out, return nothing
-            return []
-        except socket.error as exc:
-            # Catch (errno, message)-type socket.errors
-            if exc.args[0] == errno.EAGAIN:
+        for sock in self.socket():
+            try:
+                packet = sock.recv(4096)
+            except socket.timeout:
+                # If the socket times out, return nothing
                 return []
-            else:
-                raise
+            except socket.error as exc:
+                # Catch (errno, message)-type socket.errors
+                if exc.args[0] == errno.EAGAIN:
+                    return []
+                else:
+                    raise
 
-        # Append our newly-read data to our buffer
-        logger.debug('Read %s from socket', packet)
-        self._buffer += packet
+            # Append our newly-read data to our buffer
+            logger.debug('Read %s from socket', packet)
+            self._buffer += packet
 
-        responses = []
-        while len(self._buffer) >= 4:
-            size = struct.unpack('>l', self._buffer[:4])[0]
-            logger.debug('Read size of %s', size)
-            # Now check to see if there's enough left in the buffer to read the
-            # message.
-            if (len(self._buffer) - 4) >= size:
-                message = self._buffer[4:(size + 4)]
-                res = response.Response.from_raw(self, message)
-                if isinstance(res, response.Message):
-                    self.ready -= 1
-                elif not self._identify_received:
-                    # Handle the identify response if we've not yet received it
-                    if isinstance(res, response.Response):  # pragma: no branch
-                        res = self.identified(res)
-                responses.append(res)
-                self._buffer = self._buffer[(size + 4):]
-            else:
-                break
-        return responses
+            responses = []
+            while len(self._buffer) >= 4:
+                size = struct.unpack('>l', self._buffer[:4])[0]
+                logger.debug('Read size of %s', size)
+                # Now check to see if there's enough left in the buffer to read
+                # the message.
+                if (len(self._buffer) - 4) >= size:
+                    message = self._buffer[4:(size + 4)]
+                    res = response.Response.from_raw(self, message)
+                    if isinstance(res, response.Message):
+                        self.ready -= 1
+                    elif not self._identify_received:
+                        # Handle the identify response if we've not yet received it
+                        if isinstance(res, response.Response):  # pragma: no branch
+                            res = self.identified(res)
+                    responses.append(res)
+                    self._buffer = self._buffer[(size + 4):]
+                else:
+                    break
+            return responses
 
     def identified(self, res):
         '''Handle a response to our 'identify' command. Returns response'''
@@ -183,12 +200,14 @@ class Connection(object):
 
     def setblocking(self, blocking):
         '''Set whether or not this message is blocking'''
-        self._socket.setblocking(blocking)
-        self._blocking = blocking
+        for sock in self.socket():
+            sock.setblocking(blocking)
+            self._blocking = blocking
 
     def fileno(self):
         '''Returns the socket's fileno. This allows us to select on this'''
-        return self._socket.fileno()
+        for sock in self.socket():
+            return sock.fileno()
 
     def pending(self):
         '''All of the messages waiting to be sent'''
@@ -202,24 +221,25 @@ class Connection(object):
         # around a single string of the data that remains to be sent so that we
         # could potentially send larger messages
         total = 0
-        while self._pending:
-            try:
-                # Try to send as much of the first message as possible
-                count = self._socket.send(self._pending[0])
-                if count < len(self._pending[0]):
-                    # Save the rest of the message that could not be sent
-                    self._pending[0] = self._pending[0][count:]
-                    break
-                else:
-                    # Otherwise, pop off this message
-                    self._pending.pop(0)
-                    total += count
-            except socket.error as exc:
-                # Catch (errno, message)-type socket.errors
-                if exc.args[0] == errno.EAGAIN:
-                    break
-                else:
-                    raise
+        for sock in self.socket(blocking=False):
+            while self._pending:
+                try:
+                    # Try to send as much of the first message as possible
+                    count = sock.send(self._pending[0])
+                    if count < len(self._pending[0]):
+                        # Save the rest of the message that could not be sent
+                        self._pending[0] = self._pending[0][count:]
+                        break
+                    else:
+                        # Otherwise, pop off this message
+                        self._pending.pop(0)
+                        total += count
+                except socket.error as exc:
+                    # Catch (errno, message)-type socket.errors
+                    if exc.args[0] == errno.EAGAIN:
+                        break
+                    else:
+                        raise
         return total
 
     def send(self, command, message=None):
@@ -229,7 +249,8 @@ class Connection(object):
         else:
             joined = command + constants.NL
         if self._blocking:
-            self._socket.sendall(joined)
+            for sock in self.socket():
+                sock.sendall(joined)
         else:
             self._pending.append(joined)
             self.flush()

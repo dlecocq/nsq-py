@@ -13,12 +13,14 @@ class Reader(Client):
         Client.__init__(
             self, lookupd_http_addresses, nsqd_tcp_addresses, topic, **identify)
 
-    def add(self, connection):
-        '''Add this connection and manipulate its RDY state'''
-        conn = Client.add(self, connection)
-        if conn and conn.alive():
-            conn.sub(self._topic, self._channel)
-            conn.rdy(1)
+    def reconnected(self, conn):
+        '''Subscribe connection and manipulate its RDY state'''
+        conn.sub(self._topic, self._channel)
+        conn.rdy(1)
+
+    def added(self, conn):
+        '''Subscribe connection and manipulate its RDY state'''
+        self.reconnected(conn)
 
     def distribute_ready(self):
         '''Distribute the ready state across all of the connections'''

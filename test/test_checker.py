@@ -40,6 +40,22 @@ class TestPeriodicThread(unittest.TestCase):
         thread.join()
         self.assertGreaterEqual(counter['count'], 10)
 
+    def test_survives_standard_error(self):
+        '''The thread survives exceptions'''
+        def callback():
+            '''Raise an exception'''
+            raise StandardError('foo')
+
+        with mock.patch('nsq.checker.logger') as mock_logger:
+            thread = PeriodicThread(0.01, callback)
+            thread.start()
+            thread.join(0.1)
+            self.assertTrue(thread.is_alive())
+            thread.stop()
+            thread.join()
+            mock_logger.exception.assert_called_with('Callback failed')
+            self.assertGreater(mock_logger.exception.call_count, 1)
+
 
 class TestConnectionChecker(unittest.TestCase):
     '''ConnectionChecker tests'''

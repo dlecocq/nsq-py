@@ -11,6 +11,7 @@ from .checker import ConnectionChecker
 from contextlib import contextmanager
 import random
 import select
+import socket
 import threading
 
 
@@ -65,7 +66,9 @@ class Client(object):
                 new.append(self.connect(host, port))
             elif not conn.alive():
                 logger.info('Reconnecting to %s:%s', host, port)
-                conn.connect()
+                if conn.connect():
+                    conn.setblocking(0)
+                    self.reconnected(conn)
             else:
                 logger.debug('Connection to %s:%s still alive', host, port)
 
@@ -91,8 +94,10 @@ class Client(object):
                 # we'll have to make a decision about when to try to reconnect
                 # to it, if we need to reconnect to it at all
                 if conn.ready_to_reconnect():
+                    logger.info('Reconnecting to %s:%s', host, port)
                     if conn.connect():
                         conn.setblocking(0)
+                        self.reconnected(conn)
 
     @contextmanager
     def connection_checker(self):
@@ -115,10 +120,16 @@ class Client(object):
         self.add(conn)
         return conn
 
+    def reconnected(self, conn):
+        '''Hook into when a connection has been reestablished'''
+
     def connections(self):
         '''Safely return a list of all our connections'''
         with self._lock:
             return self._connections.values()
+
+    def added(self, conn):
+        '''Hook into when a connection has been added'''
 
     def add(self, connection):
         '''Add a connection'''
@@ -126,6 +137,7 @@ class Client(object):
         with self._lock:
             if key not in self._connections:
                 self._connections[key] = connection
+                self.added(connection)
                 return connection
             else:
                 return None
@@ -194,10 +206,17 @@ class Client(object):
             except exceptions.NSQException:
                 logger.exception('Failed to read from %s', conn)
                 self.close_connection(conn)
+            except socket.error:
+                logger.exception('Failed to read from %s', conn)
+                self.close_connection(conn)
 
         # For each writable socket, flush some data out
         for conn in writable:
-            conn.flush()
+            try:
+                conn.flush()
+            except socket.error:
+                logger.exception('Failed to flush %s', conn)
+                self.close_connection(conn)
 
         # For each connection with an exception, try to close it and remove it
         # from our connections
