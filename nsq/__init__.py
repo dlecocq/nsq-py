@@ -8,7 +8,7 @@ formatter = logging.Formatter(
     '%(asctime)s [%(levelname)s] %(filename)s@%(lineno)d: %(message)s')
 handler.setFormatter(formatter)
 logger.addHandler(handler)
-logger.setLevel(logging.FATAL)
+logger.setLevel(logging.INFO)
 
 # Our underlying json implmentation
 try:
