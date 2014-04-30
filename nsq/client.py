@@ -252,8 +252,8 @@ class Client(object):
             client.pub(topic, message)
             return self.wait_response()
 
-    def mpub(self, topic, messages):
+    def mpub(self, topic, *messages):
         '''Publish messages to a topic'''
         with self.random_connection() as client:
-            client.mpub(topic, messages)
+            client.mpub(topic, *messages)
             return self.wait_response()

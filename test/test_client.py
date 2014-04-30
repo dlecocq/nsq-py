@@ -282,8 +282,8 @@ class TestClientMultiple(FakeServerTest):
             with mock.patch.object(
                 self.client, 'wait_response', return_value=['response']):
                 self.assertEqual(
-                    self.client.mpub('foo', messages), ['response'])
-                connection.mpub.assert_called_with('foo', messages)
+                    self.client.mpub('foo', *messages), ['response'])
+                connection.mpub.assert_called_with('foo', *messages)
 
 
 class TestClientNsqdReconnection(FakeServerTest):
