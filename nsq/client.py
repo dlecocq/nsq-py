@@ -52,7 +52,7 @@ class Client(object):
         for lookupd in self._lookupd:
             try:
                 # Find all the current producers on this instance
-                for producer in lookupd.lookup(topic)['data']['producers']:
+                for producer in lookupd.lookup(topic)['producers']:
                     producers.append(
                         (producer['broadcast_address'], producer['tcp_port']))
             except ClientException:

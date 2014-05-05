@@ -69,12 +69,10 @@ class TestClientLookupd(FakeServerTest):
         '''Return a new client'''
         with mock.patch('nsq.client.nsqlookupd.Client') as MockClass:
             MockClass.return_value.lookup.return_value = {
-                'data': {
-                    'producers': [{
-                        'broadcast_address': 'localhost',
-                        'tcp_port': self.ports[0]
-                    }]
-                }
+                'producers': [{
+                    'broadcast_address': 'localhost',
+                    'tcp_port': self.ports[0]
+                }]
             }
             return client.Client(topic='foo',
                 lookupd_http_addresses=['http://localhost:1234'])
