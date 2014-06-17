@@ -4,12 +4,9 @@ from nsq import __version__
 
 extra = {}
 
-try:
-    from setuptools import setup
-    if sys.version_info >= (3,):
-        extra['use_2to3'] = True
-except ImportError:
-    from distutils.core import setup
+from setuptools import setup
+if sys.version_info >= (3,):
+    extra['use_2to3'] = True
 
 
 setup(name               = 'nsq-py',
@@ -27,6 +24,10 @@ setup(name               = 'nsq-py',
         'Programming Language :: Python',
         'Intended Audience :: Developers',
         'Operating System :: OS Independent'
+    ],
+    install_requires=[
+        'requests == 2.2.1',
+        'decorator==3.4.0'
     ],
     **extra
 )
