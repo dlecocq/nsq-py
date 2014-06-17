@@ -1,4 +1,5 @@
+--index-url https://pypi.python.org/simple/
+
+-e .
 nose==1.3.0
 mock==1.0.1
-requests==2.2.1
-decorator==3.4.0
