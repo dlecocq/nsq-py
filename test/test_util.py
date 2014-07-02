@@ -20,6 +20,11 @@ class TestPack(unittest.TestCase):
         expected = struct.pack('>ll90s', 94, 10, packed * 10)
         self.assertEqual(util.pack(messages), expected)
 
+    def test_iterable_of_iterables(self):
+        '''Should complain in the event of nested iterables'''
+        messages = [['hello'] * 5] * 10
+        self.assertRaises(TypeError, util.pack, messages)
+
 
 class TestHexify(unittest.TestCase):
     '''Test our hexification utility'''

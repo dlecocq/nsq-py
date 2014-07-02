@@ -3,20 +3,29 @@
 import struct
 
 
+def pack_string(message):
+    '''Pack a single message in the TCP protocol format'''
+    # [ 4-byte message size ][ N-byte binary data ]
+    return struct.pack('>l', len(message)) + message
+
+
+def pack_iterable(messages):
+    '''Pack an iterable of messages in the TCP protocol format'''
+    # [ 4-byte body size ]
+    # [ 4-byte num messages ]
+    # [ 4-byte message #1 size ][ N-byte binary data ]
+    #      ... (repeated <num_messages> times)
+    return pack_string(
+        struct.pack('>l', len(messages)) +
+        ''.join(map(pack_string, messages)))
+
+
 def pack(message):
     '''Pack the provided message'''
     if isinstance(message, basestring):
-        # Return
-        # [ 4-byte message size ][ N-byte binary data ]
-        return struct.pack('>l', len(message)) + message
+        return pack_string(message)
     else:
-        # Return
-        # [ 4-byte body size ]
-        # [ 4-byte num messages ]
-        # [ 4-byte message #1 size ][ N-byte binary data ]
-        #      ... (repeated <num_messages> times)
-        return pack(
-            struct.pack('>l', len(message)) + ''.join(map(pack, message)))
+        return pack_iterable(message)
 
 
 def hexify(message):
