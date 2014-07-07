@@ -159,7 +159,6 @@ class Connection(object):
             responses = []
             while len(self._buffer) >= 4:
                 size = struct.unpack('>l', self._buffer[:4])[0]
-                logger.debug('Read size of %s', size)
                 # Now check to see if there's enough left in the buffer to read
                 # the message.
                 if (len(self._buffer) - 4) >= size:
