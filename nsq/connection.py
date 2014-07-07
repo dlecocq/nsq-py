@@ -156,13 +156,16 @@ class Connection(object):
             self._buffer += packet
 
         responses = []
-        while len(self._buffer) >= 4:
-            size = struct.unpack('>l', self._buffer[:4])[0]
+        total = 0
+        buf = self._buffer
+        remaining = len(buf)
+        while remaining >= 4:
+            size = struct.unpack('>l', buf[total:(total + 4)])[0]
             # Now check to see if there's enough left in the buffer to read
             # the message.
-            if (len(self._buffer) - 4) >= size:
-                message = self._buffer[4:(size + 4)]
-                res = response.Response.from_raw(self, message)
+            if (remaining - 4) >= size:
+                res = response.Response.from_raw(
+                    self, buf[(total + 4):(total + size + 4)])
                 if isinstance(res, response.Message):
                     self.ready -= 1
                 elif not self._identify_received:
@@ -170,9 +173,11 @@ class Connection(object):
                     if isinstance(res, response.Response):  # pragma: no branch
                         res = self.identified(res)
                 responses.append(res)
-                self._buffer = self._buffer[(size + 4):]
+                total += (size + 4)
+                remaining -= (size + 4)
             else:
                 break
+        self._buffer = self._buffer[total:]
         return responses
 
     def identified(self, res):
