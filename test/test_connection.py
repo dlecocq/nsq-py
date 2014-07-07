@@ -5,6 +5,7 @@ import mock
 import errno
 import socket
 import struct
+from collections import deque
 
 from nsq import connection
 from nsq import constants
@@ -62,7 +63,7 @@ class TestConnection(FakeServerTest):
                 mock_socket.send.return_value = 0
                 self.client.setblocking(0)
                 self.client.nop()
-                self.assertEqual(self.client.pending(),
+                self.assertEqual(list(self.client.pending()),
                     [constants.NOP + constants.NL])
 
     def test_flush_partial(self):
@@ -78,7 +79,7 @@ class TestConnection(FakeServerTest):
                 self.client.flush()
                 # We expect all but the first byte to remain
                 message = constants.NOP + constants.NL
-                self.assertEqual(self.client.pending(), [message[1:]])
+                self.assertEqual(list(self.client.pending()), [message[1:]])
 
     def test_flush_full(self):
         '''Pops off messages it has flushed completely'''
@@ -91,7 +92,7 @@ class TestConnection(FakeServerTest):
                 self.client.nop()
                 self.client.flush()
                 # The nop message was sent, so we expect it to be popped
-                self.assertEqual(self.client.pending(), [])
+                self.assertEqual(list(self.client.pending()), [])
 
     def test_flush_count(self):
         '''Returns how many bytes were sent'''
@@ -114,7 +115,8 @@ class TestConnection(FakeServerTest):
     def test_flush_multiple(self):
         '''Flushes as many messages as possible'''
         with self.identify():
-            with mock.patch.object(self.client, '_pending', ['hello'] * 5):
+            pending = deque(['hello'] * 5)
+            with mock.patch.object(self.client, '_pending', pending):
                 with mock.patch.object(
                     self.client._socket, 'send', return_value=5):
                     self.client.flush()

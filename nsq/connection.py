@@ -12,6 +12,7 @@ import socket
 import struct
 import sys
 import threading
+from collections import deque
 
 
 class Connection(object):
@@ -99,7 +100,7 @@ class Connection(object):
                 # Set our socket's blocking state to whatever ours is
                 self._socket.setblocking(self._blocking)
                 # Safely write our magic
-                self._pending = []
+                self._pending = deque()
                 self._pending.append(constants.MAGIC_V2)
                 self.flush()
                 # And send our identify command
@@ -224,23 +225,24 @@ class Connection(object):
         # around a single string of the data that remains to be sent so that we
         # could potentially send larger messages
         total = 0
+        pending = self._pending
         for sock in self.socket(blocking=False):
-            while self._pending:
+            while pending:
                 try:
                     # Try to send as much of the first message as possible
-                    count = sock.send(self._pending[0])
-                    if count < len(self._pending[0]):
+                    count = sock.send(pending[0])
+                    total += count
+                    if count < len(pending[0]):
                         # Save the rest of the message that could not be sent
-                        self._pending[0] = self._pending[0][count:]
-                        break
+                        pending[0] = self._pending[0][count:]
+                        return total
                     else:
                         # Otherwise, pop off this message
-                        self._pending.pop(0)
-                        total += count
+                        pending.popleft()
                 except socket.error as exc:
                     # Catch (errno, message)-type socket.errors
                     if exc.args[0] == errno.EAGAIN:
-                        break
+                        return total
                     else:
                         raise
         return total
