@@ -232,13 +232,12 @@ class Connection(object):
                     # Try to send as much of the first message as possible
                     count = sock.send(pending[0])
                     total += count
-                    if count < len(pending[0]):
+                    if count == len(pending[0]):
+                        pending.popleft()
+                    else:
                         # Save the rest of the message that could not be sent
                         pending[0] = self._pending[0][count:]
                         return total
-                    else:
-                        # Otherwise, pop off this message
-                        pending.popleft()
                 except socket.error as exc:
                     # Catch (errno, message)-type socket.errors
                     if exc.args[0] == errno.EAGAIN:
