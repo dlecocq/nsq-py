@@ -153,7 +153,6 @@ class Connection(object):
                     raise
 
             # Append our newly-read data to our buffer
-            logger.debug('Read %s from socket', packet)
             self._buffer += packet
 
             responses = []
