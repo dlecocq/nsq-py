@@ -1,11 +1,11 @@
 from . import backoff
 from . import constants
 from . import logger
-from . import response
 from . import util
 from . import json
 from . import __version__
 from .sockets import TLSSocket, SnappySocket, DeflateSocket
+from .response import Response, Message
 
 import errno
 import socket
@@ -164,13 +164,13 @@ class Connection(object):
             # Now check to see if there's enough left in the buffer to read
             # the message.
             if (remaining - 4) >= size:
-                res = response.Response.from_raw(
+                res = Response.from_raw(
                     self, buf[(total + 4):(total + size + 4)])
-                if isinstance(res, response.Message):
+                if res.frame_type == Message.FRAME_TYPE:
                     self.ready -= 1
                 elif not self._identify_received:
                     # Handle the identify response if we've not yet received it
-                    if isinstance(res, response.Response):  # pragma: no branch
+                    if isinstance(res, Response):  # pragma: no branch
                         res = self.identified(res)
                 responses.append(res)
                 total += (size + 4)
