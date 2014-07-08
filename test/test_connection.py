@@ -124,7 +124,7 @@ class TestConnection(FakeServerTest):
 
     def test_flush_would_block(self):
         '''Honors EAGAIN / EWOULDBLOCK'''
-        pending = map(str, [1, 2, 3])
+        pending = deque(map(str, [1, 2, 3]))
         with self.identify():
             with mock.patch.object(self.client, '_socket') as mock_socket:
                 with mock.patch.object(self.client, '_pending', pending):
@@ -133,7 +133,7 @@ class TestConnection(FakeServerTest):
 
     def test_flush_socket_error(self):
         '''Re-raises socket non-EAGAIN errors'''
-        pending = map(str, [1, 2, 3])
+        pending = deque(map(str, [1, 2, 3]))
         with self.identify():
             with mock.patch.object(self.client, '_socket') as mock_socket:
                 with mock.patch.object(self.client, '_pending', pending):

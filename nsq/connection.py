@@ -32,7 +32,7 @@ class Connection(object):
         # Whether or not our socket is set to block
         self._blocking = 1
         # The pending messages we have to send
-        self._pending = []
+        self._pending = deque([])
         self._timeout = timeout
         # The last ready time we set our ready count, current ready count
         self.last_ready_sent = 0
@@ -100,8 +100,7 @@ class Connection(object):
                 # Set our socket's blocking state to whatever ours is
                 self._socket.setblocking(self._blocking)
                 # Safely write our magic
-                self._pending = deque()
-                self._pending.append(constants.MAGIC_V2)
+                self._pending = deque([constants.MAGIC_V2])
                 self.flush()
                 # And send our identify command
                 self.identify(self._identify_options)
@@ -234,23 +233,18 @@ class Connection(object):
         total = 0
         pending = self._pending
         for sock in self.socket(blocking=False):
-            while pending:
-                data = ''.join(pending)
-                try:
-                    # Try to send as much of the first message as possible
-                    count = sock.send(data)
-                    total += count
-                    pending.clear()
-                    if count < len(data):
-                        # Save the rest of the message that could not be sent
-                        pending.append(data[count:])
-                        return total
-                except socket.error as exc:
-                    # Catch (errno, message)-type socket.errors
-                    if exc.args[0] == errno.EAGAIN:
-                        return total
-                    else:
-                        raise
+            data = ''.join(pending.popleft() for _ in xrange(len(pending)))
+            try:
+                # Try to send as much of the first message as possible
+                total = sock.send(data[total:])
+            except socket.error as exc:
+                # Catch (errno, message)-type socket.errors
+                if exc.args[0] != errno.EAGAIN:
+                    raise
+            finally:
+                if total < len(data):
+                    # Save the rest of the message that could not be sent
+                    pending.appendleft(data[total:])
         return total
 
     def send(self, command, message=None):
