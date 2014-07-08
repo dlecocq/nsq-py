@@ -118,23 +118,25 @@ class TestConnection(FakeServerTest):
             pending = deque(['hello'] * 5)
             with mock.patch.object(self.client, '_pending', pending):
                 with mock.patch.object(
-                    self.client._socket, 'send', return_value=5):
+                    self.client._socket, 'send', return_value=25):
                     self.client.flush()
                 self.assertEqual(len(self.client.pending()), 0)
 
     def test_flush_would_block(self):
         '''Honors EAGAIN / EWOULDBLOCK'''
+        pending = map(str, [1, 2, 3])
         with self.identify():
             with mock.patch.object(self.client, '_socket') as mock_socket:
-                with mock.patch.object(self.client, '_pending', [1, 2, 3]):
+                with mock.patch.object(self.client, '_pending', pending):
                     mock_socket.send.side_effect = socket.error(errno.EAGAIN)
                     self.assertEqual(self.client.flush(), 0)
 
     def test_flush_socket_error(self):
         '''Re-raises socket non-EAGAIN errors'''
+        pending = map(str, [1, 2, 3])
         with self.identify():
             with mock.patch.object(self.client, '_socket') as mock_socket:
-                with mock.patch.object(self.client, '_pending', [1, 2, 3]):
+                with mock.patch.object(self.client, '_pending', pending):
                     mock_socket.send.side_effect = socket.error('foo')
                     self.assertRaises(socket.error, self.client.flush)
 

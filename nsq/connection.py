@@ -225,24 +225,25 @@ class Connection(object):
 
     def flush(self):
         '''Flush some of the waiting messages, returns count written'''
-        # We can only send at most one message here, because all we know is
-        # that the socket can have some data written to it. We don't know how
-        # many messages-worth might be sent. An alternative would be to keep
-        # around a single string of the data that remains to be sent so that we
-        # could potentially send larger messages
+        # When profiling, we found that while there was some efficiency to be
+        # gained elsewhere, the big performance hit is sending lots of small
+        # messages at a time. In particular, consumers send many 'FIN' messages
+        # which are very small indeed and the cost of dispatching so many system
+        # calls is very high. Instead, we prefer to glom together many messages
+        # into a single string to send at once.
         total = 0
         pending = self._pending
         for sock in self.socket(blocking=False):
             while pending:
+                data = ''.join(pending)
                 try:
                     # Try to send as much of the first message as possible
-                    count = sock.send(pending[0])
+                    count = sock.send(data)
                     total += count
-                    if count == len(pending[0]):
-                        pending.popleft()
-                    else:
+                    pending.clear()
+                    if count < len(data):
                         # Save the rest of the message that could not be sent
-                        pending[0] = self._pending[0][count:]
+                        pending.append(data[count:])
                         return total
                 except socket.error as exc:
                     # Catch (errno, message)-type socket.errors
@@ -263,7 +264,6 @@ class Connection(object):
                 sock.sendall(joined)
         else:
             self._pending.append(joined)
-            # self.flush()
 
     def identify(self, data):
         '''Send an identification message'''
