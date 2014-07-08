@@ -142,6 +142,7 @@ class TestClientMultiple(FakeServerTest):
             self.servers[0].response(constants.HEARTBEAT)
             # Get the heartbeat and automatically send the NOP
             self.assertEqual(self.client.read(), [])
+            self.assertEqual(self.client.read(), [])
             self.assertEqual(
                 self.servers[0].read(100), constants.NOP + constants.NL)
 

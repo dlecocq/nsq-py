@@ -139,12 +139,24 @@ class TestConnection(FakeServerTest):
                     self.assertRaises(socket.error, self.client.flush)
 
     def test_eager_flush(self):
-        '''Sending on a non-blocking connection eagerly flushes'''
+        '''Sending on a non-blocking connection does not eagerly flushes'''
         with self.identify():
             with mock.patch.object(self.client, 'flush') as mock_flush:
                 self.client.setblocking(0)
                 self.client.send('foo')
-                mock_flush.assert_called_with()
+                mock_flush.assert_not_called()
+
+    def test_close_flush(self):
+        '''Closing the connection flushes all remaining messages'''
+        def fake_flush():
+            self.client._pending = False
+
+        with self.identify():
+            with mock.patch.object(self.client, 'flush', fake_flush):
+                self.client.setblocking(0)
+                self.client.send('foo')
+                self.client.close()
+                self.assertEqual(self.client._pending, False)
 
     def test_magic(self):
         '''Sends the NSQ magic bytes'''

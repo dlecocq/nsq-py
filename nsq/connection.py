@@ -119,6 +119,12 @@ class Connection(object):
 
     def close(self):
         '''Close our connection'''
+        # Flush any unsent message
+        try:
+            while self.pending():
+                self.flush()
+        except socket.error:
+            pass
         with self._socket_lock:
             try:
                 if self._socket:
@@ -257,7 +263,7 @@ class Connection(object):
                 sock.sendall(joined)
         else:
             self._pending.append(joined)
-            self.flush()
+            # self.flush()
 
     def identify(self, data):
         '''Send an identification message'''
