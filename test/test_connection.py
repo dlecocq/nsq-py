@@ -5,6 +5,7 @@ import mock
 import errno
 import socket
 import struct
+from collections import deque
 
 from nsq import connection
 from nsq import constants
@@ -62,7 +63,7 @@ class TestConnection(FakeServerTest):
                 mock_socket.send.return_value = 0
                 self.client.setblocking(0)
                 self.client.nop()
-                self.assertEqual(self.client.pending(),
+                self.assertEqual(list(self.client.pending()),
                     [constants.NOP + constants.NL])
 
     def test_flush_partial(self):
@@ -78,7 +79,7 @@ class TestConnection(FakeServerTest):
                 self.client.flush()
                 # We expect all but the first byte to remain
                 message = constants.NOP + constants.NL
-                self.assertEqual(self.client.pending(), [message[1:]])
+                self.assertEqual(list(self.client.pending()), [message[1:]])
 
     def test_flush_full(self):
         '''Pops off messages it has flushed completely'''
@@ -91,7 +92,7 @@ class TestConnection(FakeServerTest):
                 self.client.nop()
                 self.client.flush()
                 # The nop message was sent, so we expect it to be popped
-                self.assertEqual(self.client.pending(), [])
+                self.assertEqual(list(self.client.pending()), [])
 
     def test_flush_count(self):
         '''Returns how many bytes were sent'''
@@ -114,35 +115,50 @@ class TestConnection(FakeServerTest):
     def test_flush_multiple(self):
         '''Flushes as many messages as possible'''
         with self.identify():
-            with mock.patch.object(self.client, '_pending', ['hello'] * 5):
+            pending = deque(['hello'] * 5)
+            with mock.patch.object(self.client, '_pending', pending):
                 with mock.patch.object(
-                    self.client._socket, 'send', return_value=5):
+                    self.client._socket, 'send', return_value=25):
                     self.client.flush()
                 self.assertEqual(len(self.client.pending()), 0)
 
     def test_flush_would_block(self):
         '''Honors EAGAIN / EWOULDBLOCK'''
+        pending = deque(map(str, [1, 2, 3]))
         with self.identify():
             with mock.patch.object(self.client, '_socket') as mock_socket:
-                with mock.patch.object(self.client, '_pending', [1, 2, 3]):
+                with mock.patch.object(self.client, '_pending', pending):
                     mock_socket.send.side_effect = socket.error(errno.EAGAIN)
                     self.assertEqual(self.client.flush(), 0)
 
     def test_flush_socket_error(self):
         '''Re-raises socket non-EAGAIN errors'''
+        pending = deque(map(str, [1, 2, 3]))
         with self.identify():
             with mock.patch.object(self.client, '_socket') as mock_socket:
-                with mock.patch.object(self.client, '_pending', [1, 2, 3]):
+                with mock.patch.object(self.client, '_pending', pending):
                     mock_socket.send.side_effect = socket.error('foo')
                     self.assertRaises(socket.error, self.client.flush)
 
     def test_eager_flush(self):
-        '''Sending on a non-blocking connection eagerly flushes'''
+        '''Sending on a non-blocking connection does not eagerly flushes'''
         with self.identify():
             with mock.patch.object(self.client, 'flush') as mock_flush:
                 self.client.setblocking(0)
                 self.client.send('foo')
-                mock_flush.assert_called_with()
+                mock_flush.assert_not_called()
+
+    def test_close_flush(self):
+        '''Closing the connection flushes all remaining messages'''
+        def fake_flush():
+            self.client._pending = False
+
+        with self.identify():
+            with mock.patch.object(self.client, 'flush', fake_flush):
+                self.client.setblocking(0)
+                self.client.send('foo')
+                self.client.close()
+                self.assertEqual(self.client._pending, False)
 
     def test_magic(self):
         '''Sends the NSQ magic bytes'''

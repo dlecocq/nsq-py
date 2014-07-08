@@ -1,7 +1,7 @@
 import inspect
 import struct
 
-from . import constants
+from .constants import FRAME_TYPE_RESPONSE, FRAME_TYPE_MESSAGE, FRAME_TYPE_ERROR
 from . import exceptions
 
 from contextlib import contextmanager
@@ -11,7 +11,7 @@ import sys
 
 class Response(object):
     '''A response from NSQ'''
-    FRAME_TYPE = constants.FRAME_TYPE_RESPONSE
+    FRAME_TYPE = FRAME_TYPE_RESPONSE
 
     __slots__ = ('connection', 'frame_type', 'data')
 
@@ -20,12 +20,12 @@ class Response(object):
         '''Return a new response from a raw buffer'''
         frame_type = struct.unpack('>l', raw[0:4])[0]
         message = raw[4:]
-        if frame_type == constants.FRAME_TYPE_RESPONSE:
-            return Response(conn, frame_type, message)
-        elif frame_type == constants.FRAME_TYPE_ERROR:
-            return Error(conn, frame_type, message)
-        elif frame_type == constants.FRAME_TYPE_MESSAGE:
+        if frame_type == FRAME_TYPE_MESSAGE:
             return Message(conn, frame_type, message)
+        elif frame_type == FRAME_TYPE_RESPONSE:
+            return Response(conn, frame_type, message)
+        elif frame_type == FRAME_TYPE_ERROR:
+            return Error(conn, frame_type, message)
         else:
             raise TypeError('Unknown frame type: %s' % frame_type)
 
@@ -51,7 +51,7 @@ class Response(object):
 
 class Message(Response):
     '''A message'''
-    FRAME_TYPE = constants.FRAME_TYPE_MESSAGE
+    FRAME_TYPE = FRAME_TYPE_MESSAGE
 
     format = '>qH16s'
     size = struct.calcsize(format)
@@ -125,7 +125,7 @@ class Message(Response):
 
 class Error(Response):
     '''An error'''
-    FRAME_TYPE = constants.FRAME_TYPE_ERROR
+    FRAME_TYPE = FRAME_TYPE_ERROR
 
     # A mapping of the response string to the appropriate exception
     mapping = {}

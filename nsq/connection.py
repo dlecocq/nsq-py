@@ -1,17 +1,18 @@
 from . import backoff
 from . import constants
 from . import logger
-from . import response
 from . import util
 from . import json
 from . import __version__
 from .sockets import TLSSocket, SnappySocket, DeflateSocket
+from .response import Response, Message
 
 import errno
 import socket
 import struct
 import sys
 import threading
+from collections import deque
 
 
 class Connection(object):
@@ -31,7 +32,7 @@ class Connection(object):
         # Whether or not our socket is set to block
         self._blocking = 1
         # The pending messages we have to send
-        self._pending = []
+        self._pending = deque([])
         self._timeout = timeout
         # The last ready time we set our ready count, current ready count
         self.last_ready_sent = 0
@@ -99,8 +100,7 @@ class Connection(object):
                 # Set our socket's blocking state to whatever ours is
                 self._socket.setblocking(self._blocking)
                 # Safely write our magic
-                self._pending = []
-                self._pending.append(constants.MAGIC_V2)
+                self._pending = deque([constants.MAGIC_V2])
                 self.flush()
                 # And send our identify command
                 self.identify(self._identify_options)
@@ -118,6 +118,12 @@ class Connection(object):
 
     def close(self):
         '''Close our connection'''
+        # Flush any unsent message
+        try:
+            while self.pending():
+                self.flush()
+        except socket.error:
+            pass
         with self._socket_lock:
             try:
                 if self._socket:
@@ -153,29 +159,32 @@ class Connection(object):
                     raise
 
             # Append our newly-read data to our buffer
-            logger.debug('Read %s from socket', packet)
             self._buffer += packet
 
-            responses = []
-            while len(self._buffer) >= 4:
-                size = struct.unpack('>l', self._buffer[:4])[0]
-                logger.debug('Read size of %s', size)
-                # Now check to see if there's enough left in the buffer to read
-                # the message.
-                if (len(self._buffer) - 4) >= size:
-                    message = self._buffer[4:(size + 4)]
-                    res = response.Response.from_raw(self, message)
-                    if isinstance(res, response.Message):
-                        self.ready -= 1
-                    elif not self._identify_received:
-                        # Handle the identify response if we've not yet received it
-                        if isinstance(res, response.Response):  # pragma: no branch
-                            res = self.identified(res)
-                    responses.append(res)
-                    self._buffer = self._buffer[(size + 4):]
-                else:
-                    break
-            return responses
+        responses = []
+        total = 0
+        buf = self._buffer
+        remaining = len(buf)
+        while remaining >= 4:
+            size = struct.unpack('>l', buf[total:(total + 4)])[0]
+            # Now check to see if there's enough left in the buffer to read
+            # the message.
+            if (remaining - 4) >= size:
+                res = Response.from_raw(
+                    self, buf[(total + 4):(total + size + 4)])
+                if res.frame_type == Message.FRAME_TYPE:
+                    self.ready -= 1
+                elif not self._identify_received:
+                    # Handle the identify response if we've not yet received it
+                    if isinstance(res, Response):  # pragma: no branch
+                        res = self.identified(res)
+                responses.append(res)
+                total += (size + 4)
+                remaining -= (size + 4)
+            else:
+                break
+        self._buffer = self._buffer[total:]
+        return responses
 
     def identified(self, res):
         '''Handle a response to our 'identify' command. Returns response'''
@@ -215,31 +224,27 @@ class Connection(object):
 
     def flush(self):
         '''Flush some of the waiting messages, returns count written'''
-        # We can only send at most one message here, because all we know is
-        # that the socket can have some data written to it. We don't know how
-        # many messages-worth might be sent. An alternative would be to keep
-        # around a single string of the data that remains to be sent so that we
-        # could potentially send larger messages
+        # When profiling, we found that while there was some efficiency to be
+        # gained elsewhere, the big performance hit is sending lots of small
+        # messages at a time. In particular, consumers send many 'FIN' messages
+        # which are very small indeed and the cost of dispatching so many system
+        # calls is very high. Instead, we prefer to glom together many messages
+        # into a single string to send at once.
         total = 0
+        pending = self._pending
         for sock in self.socket(blocking=False):
-            while self._pending:
-                try:
-                    # Try to send as much of the first message as possible
-                    count = sock.send(self._pending[0])
-                    if count < len(self._pending[0]):
-                        # Save the rest of the message that could not be sent
-                        self._pending[0] = self._pending[0][count:]
-                        break
-                    else:
-                        # Otherwise, pop off this message
-                        self._pending.pop(0)
-                        total += count
-                except socket.error as exc:
-                    # Catch (errno, message)-type socket.errors
-                    if exc.args[0] == errno.EAGAIN:
-                        break
-                    else:
-                        raise
+            data = ''.join(pending.popleft() for _ in xrange(len(pending)))
+            try:
+                # Try to send as much of the first message as possible
+                total = sock.send(data[total:])
+            except socket.error as exc:
+                # Catch (errno, message)-type socket.errors
+                if exc.args[0] != errno.EAGAIN:
+                    raise
+            finally:
+                if total < len(data):
+                    # Save the rest of the message that could not be sent
+                    pending.appendleft(data[total:])
         return total
 
     def send(self, command, message=None):
@@ -253,7 +258,6 @@ class Connection(object):
                 sock.sendall(joined)
         else:
             self._pending.append(joined)
-            self.flush()
 
     def identify(self, data):
         '''Send an identification message'''
