@@ -82,10 +82,11 @@ with closing(Reader('topic', 'channel', ...)) as reader:
 
 Benchmarks
 ==========
-The `bench` directory includes some tools for benchmarking consumers, including
-bootstrapping several local `nsqd` instances against which to run. At the time
-of writing, on a 2011 MacBook Pro the `select`-based `Reader` was able to
-consume and finish about 44k messages / second.
+There is a `shovel` task included in `shovel/profile.py` that runs a basic
+consumer benchmark against a local `nsqd` isntance. The most recent benchmark on
+a 2011 MacBook Pro shows the `select`-based `Reader` consuming about 105k
+messages / second. With `gevent` enabled, it does not appear to be statistically
+significantly different.
 
 Running Tests
 =============
