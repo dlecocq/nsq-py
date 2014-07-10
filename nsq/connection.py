@@ -236,7 +236,7 @@ class Connection(object):
             data = ''.join(pending.popleft() for _ in xrange(len(pending)))
             try:
                 # Try to send as much of the first message as possible
-                total = sock.send(data[total:])
+                total = sock.send(data)
             except socket.error as exc:
                 # Catch (errno, message)-type socket.errors
                 if exc.args[0] != errno.EAGAIN:
