@@ -5,7 +5,7 @@ import uuid
 from nsq import reader
 from nsq import response
 
-from common import FakeServerTest, IntegrationTest
+from common import FakeServerTest, IntegrationTest, HttpClientIntegrationTest
 
 
 class TestReader(FakeServerTest):
@@ -155,12 +155,13 @@ class TestReader(FakeServerTest):
             self.assertEqual(self.client.connections()[0].ready, 10)
 
 
-class TestReaderIntegration(IntegrationTest):
+class TestReaderIntegration(HttpClientIntegrationTest):
     '''Integration test for the Reader'''
     def setUp(self):
-        IntegrationTest.setUp(self)
+        HttpClientIntegrationTest.setUp(self)
+        nsqd_tcp_addresses = ['localhost:%s' % port for port in self.nsqd_ports]
         self.reader = reader.Reader(
-            self.topic, self.channel, nsqd_tcp_addresses=['localhost:4150'])
+            self.topic, self.channel, nsqd_tcp_addresses=nsqd_tcp_addresses)
 
     def test_read(self):
         '''Can receive a message in a basic way'''

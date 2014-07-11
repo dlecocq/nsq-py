@@ -1,9 +1,9 @@
 import uuid
 
-from common import IntegrationTest
+from common import HttpClientIntegrationTest
 
 
-class TestNsqlookupdClient(IntegrationTest):
+class TestNsqlookupdClient(HttpClientIntegrationTest):
     def test_ping(self):
         '''Ping the client'''
         self.assertTrue(self.nsqlookupd.ping())

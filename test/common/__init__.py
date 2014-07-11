@@ -2,5 +2,5 @@
 
 from .clienttest import ClientTest
 from .fakeservertest import FakeServerTest
+from .httpclientintegrationtest import HttpClientIntegrationTest
 from .integrationtest import IntegrationTest
-from .nsqdservertest import NsqdServerTest
