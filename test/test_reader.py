@@ -5,7 +5,7 @@ import uuid
 from nsq import reader
 from nsq import response
 
-from common import FakeServerTest, IntegrationTest, HttpClientIntegrationTest
+from common import FakeServerTest, HttpClientIntegrationTest
 
 
 class TestReader(FakeServerTest):
