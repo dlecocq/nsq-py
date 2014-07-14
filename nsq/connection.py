@@ -107,6 +107,7 @@ class Connection(object):
                 # At this point, we've not received an identify response
                 self._identify_received = False
                 self._reconnnection_counter.success()
+                self.read = self._read_establishing
                 return True
             except:
                 logger.exception('Failed to connect')
@@ -139,52 +140,6 @@ class Connection(object):
                 yield self._socket
             finally:
                 self._socket_lock.release()
-
-    def read(self):
-        '''Read from the socket, and return a list of responses'''
-        # It's important to know that it may return no responses or multiple
-        # responses. It depends on how the buffering works out. First, read from
-        # the socket
-        for sock in self.socket():
-            try:
-                packet = sock.recv(4096)
-            except socket.timeout:
-                # If the socket times out, return nothing
-                return []
-            except socket.error as exc:
-                # Catch (errno, message)-type socket.errors
-                if exc.args[0] == errno.EAGAIN:
-                    return []
-                else:
-                    raise
-
-            # Append our newly-read data to our buffer
-            self._buffer += packet
-
-        responses = []
-        total = 0
-        buf = self._buffer
-        remaining = len(buf)
-        while remaining >= 4:
-            size = struct.unpack('>l', buf[total:(total + 4)])[0]
-            # Now check to see if there's enough left in the buffer to read
-            # the message.
-            if (remaining - 4) >= size:
-                res = Response.from_raw(
-                    self, buf[(total + 4):(total + size + 4)])
-                if res.frame_type == Message.FRAME_TYPE:
-                    self.ready -= 1
-                elif not self._identify_received:
-                    # Handle the identify response if we've not yet received it
-                    if isinstance(res, Response):  # pragma: no branch
-                        res = self.identified(res)
-                responses.append(res)
-                total += (size + 4)
-                remaining -= (size + 4)
-            else:
-                break
-        self._buffer = self._buffer[total:]
-        return responses
 
     def identified(self, res):
         '''Handle a response to our 'identify' command. Returns response'''
@@ -300,3 +255,65 @@ class Connection(object):
     def nop(self):
         '''Send a no-op'''
         return self.send(constants.NOP)
+
+    # These are the various incarnations of our read method. In some instances,
+    # we want to return responses in the typical way. But while establishing
+    # connections or negotiating a TLS connection, we need to do different
+    # things
+    def _read_responses(self, limit=1000):
+        '''Return all the responses read'''
+        # It's important to know that it may return no responses or multiple
+        # responses. It depends on how the buffering works out. First, read from
+        # the socket
+        for sock in self.socket():
+            try:
+                packet = sock.recv(4096)
+            except socket.timeout:
+                # If the socket times out, return nothing
+                return []
+            except socket.error as exc:
+                # Catch (errno, message)-type socket.errors
+                if exc.args[0] == errno.EAGAIN:
+                    return []
+                else:
+                    raise
+
+            # Append our newly-read data to our buffer
+            self._buffer += packet
+
+        responses = []
+        total = 0
+        buf = self._buffer
+        remaining = len(buf)
+        while limit and (remaining >= 4):
+            size = struct.unpack('>l', buf[total:(total + 4)])[0]
+            # Now check to see if there's enough left in the buffer to read
+            # the message.
+            if (remaining - 4) >= size:
+                responses.append(Response.from_raw(
+                    self, buf[(total + 4):(total + size + 4)]))
+                total += (size + 4)
+                remaining -= (size + 4)
+                limit -= 1
+            else:
+                break
+        self._buffer = self._buffer[total:]
+        return responses
+
+    def _read_established(self):
+        '''Responses from an established socket'''
+        responses = self._read_responses()
+        # Determine the number of messages in here and decrement our ready
+        # count appropriately
+        self.ready -= sum(
+            map(int, (r.frame_type == Message.FRAME_TYPE for r in responses)))
+        return responses
+
+    def _read_establishing(self):
+        '''Continue negotiating the connection'''
+        responses = self._read_responses(1)
+        if responses:
+            # Handle the response identification
+            responses[0] = self.identified(responses[0])
+            self.read = self._read_established
+        return responses
