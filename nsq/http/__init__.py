@@ -3,7 +3,7 @@
 from decorator import decorator
 import requests
 
-from .. import json
+from .. import json, logger
 from ..exceptions import NSQException
 
 
@@ -12,6 +12,7 @@ def wrap(function, *args, **kwargs):
     '''Wrap a function that returns a request with some exception handling'''
     try:
         req = function(*args, **kwargs)
+        logger.info('Got %s: %s', req.status_code, req.content)
         if req.status_code == 200:
             return req
         else:
@@ -64,8 +65,9 @@ class BaseClient(object):
     @wrap
     def get(self, path, *args, **kwargs):
         '''GET the provided endpoint'''
-        return requests.get(
-            'http://%s:%s%s' % (self._host, self._port, path), *args, **kwargs)
+        url = 'http://%s:%s%s' % (self._host, self._port, path)
+        logger.info('Get %s with %s, %s', url, args, kwargs)
+        return requests.get(url, *args, **kwargs)
 
     @wrap
     def post(self, path, *args, **kwargs):

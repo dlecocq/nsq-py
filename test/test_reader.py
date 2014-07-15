@@ -5,20 +5,16 @@ import uuid
 from nsq import reader
 from nsq import response
 
-from common import FakeServerTest, HttpClientIntegrationTest
+from common import HttpClientIntegrationTest
 
 
-class TestReader(FakeServerTest):
+class TestReader(HttpClientIntegrationTest):
     '''Tests for our reader class'''
     def setUp(self):
-        self.topic = 'foo-topic'
-        self.channel = 'foo-channel'
-        FakeServerTest.setUp(self)
-
-    def connect(self):
         '''Return a connection'''
-        return reader.Reader(self.topic, self.channel,
-            nsqd_tcp_addresses=['localhost:12345'])
+        HttpClientIntegrationTest.setUp(self)
+        self.client = reader.Reader(self.topic, self.channel,
+            nsqd_tcp_addresses=['localhost:14150'])
 
     def test_it_subscribes(self):
         '''It subscribes for newly-established connections'''
@@ -148,11 +144,11 @@ class TestReader(FakeServerTest):
             found = [iterator.next() for _ in range(10)]
             self.assertEqual(messages, found)
 
-    def test_honors_max_rdy_count(self):
-        '''Honors the max RDY count provided in an identify response'''
-        with self.identify({'max_rdy_count': 10}):
-            self.client.distribute_ready()
-            self.assertEqual(self.client.connections()[0].ready, 10)
+    # def test_honors_max_rdy_count(self):
+    #     '''Honors the max RDY count provided in an identify response'''
+    #     with self.identify({'max_rdy_count': 10}):
+    #         self.client.distribute_ready()
+    #         self.assertEqual(self.client.connections()[0].ready, 10)
 
 
 class TestReaderIntegration(HttpClientIntegrationTest):

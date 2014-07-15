@@ -16,10 +16,10 @@ class HttpClientIntegrationTest(IntegrationTest):
         self.nsqlookupd = nsqlookupd.Client('http://localhost:14161')
 
         # Create this topic
-        self.nsqd.create_topic(self.topic)
-        self.nsqd.create_channel(self.topic, self.channel)
         self.nsqlookupd.create_topic(self.topic)
         self.nsqlookupd.create_channel(self.topic, self.channel)
+        self.nsqd.create_topic(self.topic)
+        self.nsqd.create_channel(self.topic, self.channel)
 
     def tearDown(self):
         with self.delete_topic(self.topic):

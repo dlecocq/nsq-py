@@ -10,7 +10,7 @@ from .checker import ConnectionChecker
 
 from contextlib import contextmanager
 import random
-import select
+from select import select
 import socket
 import threading
 
@@ -53,6 +53,7 @@ class Client(object):
             try:
                 # Find all the current producers on this instance
                 for producer in lookupd.lookup(topic)['producers']:
+                    logger.info('Found producer %s on %s', producer, lookupd)
                     producers.append(
                         (producer['broadcast_address'], producer['tcp_port']))
             except ClientException:
@@ -172,7 +173,7 @@ class Client(object):
         # Not all connections need to be written to, so we'll only concern
         # ourselves with those that require writes
         writes = [c for c in connections if c.pending()]
-        readable, writable, exceptable = select.select(
+        readable, writable, exceptable = select(
             connections, writes, connections, self._timeout)
 
         # If we returned because the timeout interval passed, log it and return

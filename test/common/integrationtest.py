@@ -60,7 +60,7 @@ class ProcessWrapper(object):
 
 class Nsqd(ProcessWrapper):
     '''Wraps an instance of nsqd'''
-    def __init__(self, port):
+    def __init__(self, port, nsqlookupd):
         self._client = nsqd.Client('http://localhost:%s' % (port + 1))
         options = {
             'data-path': 'test/tmp',
@@ -69,7 +69,8 @@ class Nsqd(ProcessWrapper):
             'tls-cert': 'test/fixtures/certificates/cert.pem',
             'tls-key': 'test/fixtures/certificates/key.pem',
             'tcp-address': '0.0.0.0:%s' % (port),
-            'http-address': '0.0.0.0:%s' % (port + 1)
+            'http-address': '0.0.0.0:%s' % (port + 1),
+            'lookupd-tcp-address': '127.0.0.1:%s' % nsqlookupd
         }
         args = ['--%s=%s' % (k, v) for k, v in options.items()]
         ProcessWrapper.__init__(self, 'nsqd', *args)
@@ -96,7 +97,9 @@ class IntegrationTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         # TODO(dan): Ensure that test/tmp exists and is empty
-        instances = [Nsqlookupd(cls.nsqlookupd_port)] + map(Nsqd, cls.nsqd_ports)
+        instances = (
+            [Nsqlookupd(cls.nsqlookupd_port)] +
+            [Nsqd(p, cls.nsqlookupd_port) for p in cls.nsqd_ports])
         cls._context = nested(*[i.run() for i in instances])
         cls._context.__enter__()
 

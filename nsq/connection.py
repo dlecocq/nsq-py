@@ -38,7 +38,6 @@ class Connection(object):
         self.last_ready_sent = 0
         self.ready = 0
         # Whether or not we've received an identify response
-        self._identify_received = False
         self._identify_response = {}
         # The options to use when identifying
         self._identify_options = dict(identify)
@@ -104,10 +103,13 @@ class Connection(object):
                 self.flush()
                 # And send our identify command
                 self.identify(self._identify_options)
-                # At this point, we've not received an identify response
-                self._identify_received = False
                 self._reconnnection_counter.success()
-                self.read = self._read_establishing
+                # Wait until we've gotten a response to IDENTIFY, try to read
+                # one
+                responses = []
+                while not responses:
+                    responses = self._read(1)
+                self.identified(responses[0])
                 return True
             except:
                 logger.exception('Failed to connect')
@@ -153,9 +155,6 @@ class Connection(object):
                 'max_rdy_count', self.max_rdy_count)
         except:
             pass
-        finally:
-            # Always mark that we've now handled the receive
-            self._identify_received = True
         return res
 
     def alive(self):
@@ -260,7 +259,7 @@ class Connection(object):
     # we want to return responses in the typical way. But while establishing
     # connections or negotiating a TLS connection, we need to do different
     # things
-    def _read_responses(self, limit=1000):
+    def _read(self, limit=1000):
         '''Return all the responses read'''
         # It's important to know that it may return no responses or multiple
         # responses. It depends on how the buffering works out. First, read from
@@ -300,20 +299,11 @@ class Connection(object):
         self._buffer = self._buffer[total:]
         return responses
 
-    def _read_established(self):
+    def read(self):
         '''Responses from an established socket'''
-        responses = self._read_responses()
+        responses = self._read()
         # Determine the number of messages in here and decrement our ready
         # count appropriately
         self.ready -= sum(
             map(int, (r.frame_type == Message.FRAME_TYPE for r in responses)))
-        return responses
-
-    def _read_establishing(self):
-        '''Continue negotiating the connection'''
-        responses = self._read_responses(1)
-        if responses:
-            # Handle the response identification
-            responses[0] = self.identified(responses[0])
-            self.read = self._read_established
         return responses
