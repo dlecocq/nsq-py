@@ -1,7 +1,6 @@
 #! /usr/bin/env python
 
 import mock
-import unittest
 
 import errno
 import socket
@@ -12,7 +11,7 @@ from nsq import constants
 from nsq import response
 from nsq import util
 from nsq import json
-from common import MockedSocketTest
+from common import MockedSocketTest, HttpClientIntegrationTest
 
 
 class TestConnection(MockedSocketTest):
@@ -344,3 +343,25 @@ class TestConnection(MockedSocketTest):
         with mock.patch('nsq.connection.socket') as mock_socket:
             mock_socket.socket = mock.Mock(side_effect=socket.error)
             self.assertFalse(self.connection.connect())
+
+
+class TestConnection(HttpClientIntegrationTest):
+    '''We can establish a connection with TLS'''
+    def setUp(self):
+        HttpClientIntegrationTest.setUp(self)
+        self.connection = connection.Connection('localhost', 14150, tls_v1=True)
+        self.connection.setblocking(0)
+
+    def test_alive(self):
+        '''The connection is alive'''
+        self.assertTrue(self.connection.alive())
+
+    def test_basic(self):
+        '''Can send and receive things'''
+        self.connection.pub('foo', 'bar')
+        self.connection.flush()
+        responses = []
+        while not responses:
+            responses = self.connection.read()
+        self.assertEqual(len(responses), 1)
+        self.assertEqual(responses[0].data, 'OK')

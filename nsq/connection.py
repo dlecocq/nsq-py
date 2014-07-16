@@ -158,6 +158,11 @@ class Connection(object):
             # Save our max ready count unless it's not provided
             self.max_rdy_count = res.data.get(
                 'max_rdy_count', self.max_rdy_count)
+            if self._identify_options.get('tls_v1', False):
+                if not self._identify_response.get('tls_v1', False):
+                    logger.warn('NSQd instance does not support TLS')
+                else:
+                    self._socket = TLSSocket.wrap_socket(self._socket)
         except:
             pass
         return res
