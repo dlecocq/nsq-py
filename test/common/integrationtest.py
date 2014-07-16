@@ -68,6 +68,7 @@ class Nsqd(ProcessWrapper):
             'snappy': 'true',
             'tls-cert': 'test/fixtures/certificates/cert.pem',
             'tls-key': 'test/fixtures/certificates/key.pem',
+            'broadcast-address': 'localhost',
             'tcp-address': '0.0.0.0:%s' % (port),
             'http-address': '0.0.0.0:%s' % (port + 1),
             'lookupd-tcp-address': '127.0.0.1:%s' % nsqlookupd

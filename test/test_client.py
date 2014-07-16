@@ -96,15 +96,15 @@ class TestClientLookupd(HttpClientIntegrationTest):
         self.client.discover(self.topic)
         self.assertEqual(self.client.connections(), before)
 
-    # def test_discover_closed(self):
-    #     '''Reconnects to discovered servers that have closed connections'''
-    #     for conn in self.client.connections():
-    #         conn.close()
-    #     state = [conn.alive() for conn in self.client.connections()]
-    #     self.assertEqual(state, [False])
-    #     self.client.discover(self.topic)
-    #     state = [conn.alive() for conn in self.client.connections()]
-    #     self.assertEqual(state, [True])
+    def test_discover_closed(self):
+        '''Reconnects to discovered servers that have closed connections'''
+        for conn in self.client.connections():
+            conn.close()
+        state = [conn.alive() for conn in self.client.connections()]
+        self.assertEqual(state, [False])
+        self.client.discover(self.topic)
+        state = [conn.alive() for conn in self.client.connections()]
+        self.assertEqual(state, [True])
 
 
 class TestClientMultiple(MockedConnectionTest):
@@ -282,14 +282,13 @@ class TestClientMultiple(MockedConnectionTest):
         self.client.check_connections()
         self.assertFalse(conn.connect.called)
 
-    # def test_ready_to_reconnect(self):
-    #     '''Tries to reconnect when ready'''
-    #     conn = self.connections[0]
-    #     print conn
-    #     conn.close()
-    #     conn.ready_to_reconnect.return_value = True
-    #     self.client.check_connections()
-    #     self.assertTrue(conn.connect.called)
+    def test_ready_to_reconnect(self):
+        '''Tries to reconnect when ready'''
+        conn = self.connections[0]
+        conn.close()
+        conn.ready_to_reconnect.return_value = True
+        self.client.check_connections()
+        self.assertTrue(conn.connect.called)
 
     def test_set_blocking(self):
         '''Sets blocking to 0 when reconnecting'''
@@ -300,12 +299,12 @@ class TestClientMultiple(MockedConnectionTest):
         self.client.check_connections()
         conn.setblocking.assert_called_with(0)
 
-    # def test_calls_reconnected(self):
-    #     '''Sets blocking to 0 when reconnecting'''
-    #     conn = self.connections[0]
-    #     conn.close()
-    #     conn.ready_to_reconnect.return_value = True
-    #     conn.connect.return_value = True
-    #     with mock.patch.object(self.client, 'reconnected'):
-    #         self.client.check_connections()
-    #         self.client.reconnected.assert_called_with(conn)
+    def test_calls_reconnected(self):
+        '''Sets blocking to 0 when reconnecting'''
+        conn = self.connections[0]
+        conn.close()
+        conn.ready_to_reconnect.return_value = True
+        conn.connect.return_value = True
+        with mock.patch.object(self.client, 'reconnected'):
+            self.client.check_connections()
+            self.client.reconnected.assert_called_with(conn)

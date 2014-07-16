@@ -6,8 +6,10 @@ from nsq import response
 
 
 class MockConnection(mock.Mock):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, host=None, port=None, *args, **kwargs):
         mock.Mock.__init__(self)
+        self.host = host
+        self.port = port
         self._responses = []
         self._alive = True
 

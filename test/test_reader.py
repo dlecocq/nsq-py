@@ -10,11 +10,14 @@ from common import HttpClientIntegrationTest
 
 class TestReader(HttpClientIntegrationTest):
     '''Tests for our reader class'''
+    nsqd_ports = (14150, 14152)
+
     def setUp(self):
         '''Return a connection'''
         HttpClientIntegrationTest.setUp(self)
-        self.client = reader.Reader(self.topic, self.channel,
-            nsqd_tcp_addresses=['localhost:14150'])
+        nsqd_tcp_addresses = ['localhost:%s' % port for port in self.nsqd_ports]
+        self.client = reader.Reader(
+            self.topic, self.channel, nsqd_tcp_addresses=nsqd_tcp_addresses)
 
     def test_it_subscribes(self):
         '''It subscribes for newly-established connections'''
@@ -91,7 +94,7 @@ class TestReader(HttpClientIntegrationTest):
         with mock.patch.object(self.client, 'connections', return_value=[]):
             self.assertFalse(self.client.needs_distribute_ready())
 
-    def test_read(self):
+    def test_read_distribute_ready(self):
         '''Read checks if we need to distribute ready'''
         with mock.patch('nsq.reader.Client'):
             with mock.patch.object(
@@ -101,7 +104,7 @@ class TestReader(HttpClientIntegrationTest):
                     self.client.read()
                     mock_ready.assert_called_with()
 
-    def test_read_not_ready(self):
+    def test_read_not_distribute_ready(self):
         '''Does not redistribute ready if not needed'''
         with mock.patch('nsq.reader.Client'):
             with mock.patch.object(
@@ -144,23 +147,21 @@ class TestReader(HttpClientIntegrationTest):
             found = [iterator.next() for _ in range(10)]
             self.assertEqual(messages, found)
 
-    # def test_honors_max_rdy_count(self):
-    #     '''Honors the max RDY count provided in an identify response'''
-    #     with self.identify({'max_rdy_count': 10}):
-    #         self.client.distribute_ready()
-    #         self.assertEqual(self.client.connections()[0].ready, 10)
-
-
-class TestReaderIntegration(HttpClientIntegrationTest):
-    '''Integration test for the Reader'''
-    def setUp(self):
-        HttpClientIntegrationTest.setUp(self)
-        nsqd_tcp_addresses = ['localhost:%s' % port for port in self.nsqd_ports]
-        self.reader = reader.Reader(
-            self.topic, self.channel, nsqd_tcp_addresses=nsqd_tcp_addresses)
+    def test_honors_max_rdy_count(self):
+        '''Honors the max RDY count provided in an identify response'''
+        for conn in self.client.connections():
+            conn.max_rdy_count = 10
+        self.client.distribute_ready()
+        self.assertEqual(self.client.connections()[0].ready, 10)
 
     def test_read(self):
         '''Can receive a message in a basic way'''
         self.nsqd.pub(self.topic, 'hello')
-        message = iter(self.reader).next()
+        message = iter(self.client).next()
         self.assertEqual(message.body, 'hello')
+
+    def test_close_redistribute(self):
+        '''Redistributes rdy count when a connection is closed'''
+        with mock.patch.object(self.client, 'distribute_ready') as mock_ready:
+            self.client.close_connection(self.client.connections()[0])
+            mock_ready.assert_called_with()
