@@ -8,6 +8,7 @@ from collections import deque
 
 from nsq import connection
 from nsq import constants
+from nsq import exceptions
 from nsq import response
 from nsq import util
 from nsq import json
@@ -287,30 +288,30 @@ class TestConnection(MockedSocketTest):
     def test_identify_tls_unsupported(self):
         '''Raises an exception about the lack of TLS support'''
         with mock.patch('nsq.connection.TLSSocket', None):
-            self.assertRaises(
-                AssertionError, connection.Connection, 'host', 0, tls_v1=True)
+            self.assertRaises(exceptions.UnsupportedException,
+                connection.Connection, 'host', 0, tls_v1=True)
 
     def test_identify_snappy_unsupported(self):
         '''Raises an exception about the lack of snappy support'''
         with mock.patch('nsq.connection.SnappySocket', None):
-            self.assertRaises(
-                AssertionError, connection.Connection, 'host', 0, snappy=True)
+            self.assertRaises(exceptions.UnsupportedException,
+                connection.Connection, 'host', 0, snappy=True)
 
     def test_identify_deflate_unsupported(self):
         '''Raises an exception about the lack of deflate support'''
         with mock.patch('nsq.connection.DeflateSocket', None):
-            self.assertRaises(
-                AssertionError, connection.Connection, 'host', 0, deflate=True)
+            self.assertRaises(exceptions.UnsupportedException,
+                connection.Connection, 'host', 0, deflate=True)
 
     def test_identify_no_deflate_level(self):
         '''Raises an exception about the lack of deflate_level support'''
         with mock.patch('nsq.connection.DeflateSocket', None):
-            self.assertRaises(AssertionError,
+            self.assertRaises(exceptions.UnsupportedException,
                 connection.Connection, 'host', 0, deflate_level=True)
 
     def test_identify_no_snappy_and_deflate(self):
         '''We should yell early about incompatible snappy and deflate options'''
-        self.assertRaises(AssertionError,
+        self.assertRaises(exceptions.UnsupportedException,
             connection.Connection, 'host', 0, snappy=True, deflate=True)
 
     def test_identify_saves_identify_response(self):
@@ -344,8 +345,24 @@ class TestConnection(MockedSocketTest):
             mock_socket.socket = mock.Mock(side_effect=socket.error)
             self.assertFalse(self.connection.connect())
 
+    def test_tls_unsupported(self):
+        '''Raises an exception if the server does not support TLS'''
+        res = response.Response(self.connection,
+            response.Response.FRAME_TYPE, json.dumps({'tls_v1': False}))
+        options = {'tls_v1': True}
+        with mock.patch.object(self.connection, '_identify_options', options):
+            self.assertRaises(exceptions.UnsupportedException,
+                self.connection.identified, res)
 
-class TestConnection(HttpClientIntegrationTest):
+    def test_ok_response(self):
+        '''Sets our _identify_response to {} if 'OK' is provided'''
+        res = response.Response(
+            self.connection, response.Response.FRAME_TYPE, 'OK')
+        self.connection.identified(res)
+        self.assertEqual(self.connection._identify_response, {})
+
+
+class TestConnectionIntegration(HttpClientIntegrationTest):
     '''We can establish a connection with TLS'''
     def setUp(self):
         HttpClientIntegrationTest.setUp(self)

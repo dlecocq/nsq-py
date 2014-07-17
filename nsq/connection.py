@@ -4,6 +4,7 @@ from . import logger
 from . import util
 from . import json
 from . import __version__
+from .exceptions import UnsupportedException
 from .sockets import TLSSocket, SnappySocket, DeflateSocket
 from .response import Response, Message
 
@@ -58,8 +59,8 @@ class Connection(object):
         if not TLSSocket:  # pragma: no branch
             disallowed.append('tls_v1')
         for key in disallowed:
-            assert not self._identify_options.get(key, False), (
-                'Option %s is not supported' % key)
+            if self._identify_options.get(key, False):
+                raise UnsupportedException('Option %s is not supported' % key)
 
         # Our backoff policy for reconnection. The default is to use an
         # exponential backoff 8 * (2 ** attempt) clamped to [0, 60]
@@ -155,16 +156,20 @@ class Connection(object):
         try:
             res.data = json.loads(res.data)
             self._identify_response = res.data
-            # Save our max ready count unless it's not provided
-            self.max_rdy_count = res.data.get(
-                'max_rdy_count', self.max_rdy_count)
-            if self._identify_options.get('tls_v1', False):
-                if not self._identify_response.get('tls_v1', False):
-                    logger.warn('NSQd instance does not support TLS')
-                else:
-                    self._socket = TLSSocket.wrap_socket(self._socket)
+            logger.info('Got identify response: %s', res.data)
         except:
-            pass
+            logger.warn('Server does not support feature negotiation')
+            self._identify_response = {}
+
+        # Save our max ready count unless it's not provided
+        self.max_rdy_count = self._identify_response.get(
+            'max_rdy_count', self.max_rdy_count)
+        if self._identify_options.get('tls_v1', False):
+            if not self._identify_response.get('tls_v1', False):
+                raise UnsupportedException(
+                    'NSQd instance does not support TLS')
+            else:
+                self._socket = TLSSocket.wrap_socket(self._socket)
         return res
 
     def alive(self):
