@@ -4,6 +4,7 @@ from . import logger
 from . import util
 from . import json
 from . import __version__
+from .exceptions import UnsupportedException
 from .sockets import TLSSocket, SnappySocket, DeflateSocket
 from .response import Response, Message
 
@@ -38,7 +39,6 @@ class Connection(object):
         self.last_ready_sent = 0
         self.ready = 0
         # Whether or not we've received an identify response
-        self._identify_received = False
         self._identify_response = {}
         # The options to use when identifying
         self._identify_options = dict(identify)
@@ -59,8 +59,8 @@ class Connection(object):
         if not TLSSocket:  # pragma: no branch
             disallowed.append('tls_v1')
         for key in disallowed:
-            assert not self._identify_options.get(key, False), (
-                'Option %s is not supported' % key)
+            if self._identify_options.get(key, False):
+                raise UnsupportedException('Option %s is not supported' % key)
 
         # Our backoff policy for reconnection. The default is to use an
         # exponential backoff 8 * (2 ** attempt) clamped to [0, 60]
@@ -94,19 +94,28 @@ class Connection(object):
         # Otherwise, try to connect
         with self._socket_lock:
             try:
+                logger.info('Creating socket...')
                 self._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 self._socket.settimeout(self._timeout)
+                logger.info('Connecting to %s, %s', self.host, self.port)
                 self._socket.connect((self.host, self.port))
                 # Set our socket's blocking state to whatever ours is
                 self._socket.setblocking(self._blocking)
                 # Safely write our magic
                 self._pending = deque([constants.MAGIC_V2])
-                self.flush()
+                while self.pending():
+                    self.flush()
                 # And send our identify command
                 self.identify(self._identify_options)
-                # At this point, we've not received an identify response
-                self._identify_received = False
+                while self.pending():
+                    self.flush()
                 self._reconnnection_counter.success()
+                # Wait until we've gotten a response to IDENTIFY, try to read
+                # one
+                responses = []
+                while not responses:
+                    responses = self._read(1)
+                self.identified(responses[0])
                 return True
             except:
                 logger.exception('Failed to connect')
@@ -140,52 +149,6 @@ class Connection(object):
             finally:
                 self._socket_lock.release()
 
-    def read(self):
-        '''Read from the socket, and return a list of responses'''
-        # It's important to know that it may return no responses or multiple
-        # responses. It depends on how the buffering works out. First, read from
-        # the socket
-        for sock in self.socket():
-            try:
-                packet = sock.recv(4096)
-            except socket.timeout:
-                # If the socket times out, return nothing
-                return []
-            except socket.error as exc:
-                # Catch (errno, message)-type socket.errors
-                if exc.args[0] == errno.EAGAIN:
-                    return []
-                else:
-                    raise
-
-            # Append our newly-read data to our buffer
-            self._buffer += packet
-
-        responses = []
-        total = 0
-        buf = self._buffer
-        remaining = len(buf)
-        while remaining >= 4:
-            size = struct.unpack('>l', buf[total:(total + 4)])[0]
-            # Now check to see if there's enough left in the buffer to read
-            # the message.
-            if (remaining - 4) >= size:
-                res = Response.from_raw(
-                    self, buf[(total + 4):(total + size + 4)])
-                if res.frame_type == Message.FRAME_TYPE:
-                    self.ready -= 1
-                elif not self._identify_received:
-                    # Handle the identify response if we've not yet received it
-                    if isinstance(res, Response):  # pragma: no branch
-                        res = self.identified(res)
-                responses.append(res)
-                total += (size + 4)
-                remaining -= (size + 4)
-            else:
-                break
-        self._buffer = self._buffer[total:]
-        return responses
-
     def identified(self, res):
         '''Handle a response to our 'identify' command. Returns response'''
         # If they support it, they should give us a JSON blob which we should
@@ -193,14 +156,20 @@ class Connection(object):
         try:
             res.data = json.loads(res.data)
             self._identify_response = res.data
-            # Save our max ready count unless it's not provided
-            self.max_rdy_count = res.data.get(
-                'max_rdy_count', self.max_rdy_count)
+            logger.info('Got identify response: %s', res.data)
         except:
-            pass
-        finally:
-            # Always mark that we've now handled the receive
-            self._identify_received = True
+            logger.warn('Server does not support feature negotiation')
+            self._identify_response = {}
+
+        # Save our max ready count unless it's not provided
+        self.max_rdy_count = self._identify_response.get(
+            'max_rdy_count', self.max_rdy_count)
+        if self._identify_options.get('tls_v1', False):
+            if not self._identify_response.get('tls_v1', False):
+                raise UnsupportedException(
+                    'NSQd instance does not support TLS')
+            else:
+                self._socket = TLSSocket.wrap_socket(self._socket)
         return res
 
     def alive(self):
@@ -300,3 +269,56 @@ class Connection(object):
     def nop(self):
         '''Send a no-op'''
         return self.send(constants.NOP)
+
+    # These are the various incarnations of our read method. In some instances,
+    # we want to return responses in the typical way. But while establishing
+    # connections or negotiating a TLS connection, we need to do different
+    # things
+    def _read(self, limit=1000):
+        '''Return all the responses read'''
+        # It's important to know that it may return no responses or multiple
+        # responses. It depends on how the buffering works out. First, read from
+        # the socket
+        for sock in self.socket():
+            try:
+                packet = sock.recv(4096)
+            except socket.timeout:
+                # If the socket times out, return nothing
+                return []
+            except socket.error as exc:
+                # Catch (errno, message)-type socket.errors
+                if exc.args[0] == errno.EAGAIN:
+                    return []
+                else:
+                    raise
+
+            # Append our newly-read data to our buffer
+            self._buffer += packet
+
+        responses = []
+        total = 0
+        buf = self._buffer
+        remaining = len(buf)
+        while limit and (remaining >= 4):
+            size = struct.unpack('>l', buf[total:(total + 4)])[0]
+            # Now check to see if there's enough left in the buffer to read
+            # the message.
+            if (remaining - 4) >= size:
+                responses.append(Response.from_raw(
+                    self, buf[(total + 4):(total + size + 4)]))
+                total += (size + 4)
+                remaining -= (size + 4)
+                limit -= 1
+            else:
+                break
+        self._buffer = self._buffer[total:]
+        return responses
+
+    def read(self):
+        '''Responses from an established socket'''
+        responses = self._read()
+        # Determine the number of messages in here and decrement our ready
+        # count appropriately
+        self.ready -= sum(
+            map(int, (r.frame_type == Message.FRAME_TYPE for r in responses)))
+        return responses

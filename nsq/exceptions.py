@@ -1,8 +1,12 @@
 '''Exception classes'''
 
 
-class NSQException(Exception):
+class NSQException(StandardError):
     '''Base class for all exceptions in this library'''
+
+
+class UnsupportedException(NSQException):
+    '''When a requested feature cannot be used'''
 
 
 class TimeoutException(NSQException):

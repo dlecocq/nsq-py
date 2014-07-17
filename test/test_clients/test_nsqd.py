@@ -1,10 +1,8 @@
-import unittest
-
 import uuid
 
 from nsq.http import nsqd, ClientException
 from nsq.util import pack
-from common import IntegrationTest, ClientTest
+from common import HttpClientIntegrationTest, ClientTest
 
 
 class TestNsqdClient(ClientTest):
@@ -39,7 +37,7 @@ class TestNsqdClient(ClientTest):
             ClientException, self.client.mpub, 'topic', messages, binary=False)
 
 
-class TestNsqdClientIntegration(IntegrationTest):
+class TestNsqdClientIntegration(HttpClientIntegrationTest):
     '''An integration test of the nsqd client'''
     def test_ping_ok(self):
         '''Make sure ping works in a basic way'''

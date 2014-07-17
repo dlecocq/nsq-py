@@ -9,4 +9,4 @@ clean:
 .PHONY: test
 test:
 	rm -f .coverage
-	nosetests --exe --cover-package=nsq --with-coverage --cover-branches -v
+	nosetests --exe --cover-package=nsq --with-coverage --cover-branches -v --logging-clear-handlers
