@@ -97,6 +97,8 @@ class IntegrationTest(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
+        if not os.path.exists('test/tmp'):
+            os.mkdir('test/tmp')
         # TODO(dan): Ensure that test/tmp exists and is empty
         instances = (
             [Nsqlookupd(cls.nsqlookupd_port)] +
@@ -107,3 +109,6 @@ class IntegrationTest(unittest.TestCase):
     @classmethod
     def tearDownClass(cls):
         cls._context.__exit__(None, None, None)
+        # Also remove the tmp directory
+        for path in os.listdir('test/tmp'):
+            os.remove(os.path.join('test/tmp', path))
