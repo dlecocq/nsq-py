@@ -209,6 +209,11 @@ class TestConnection(MockedSocketTest):
         self.connection.flush()
         self.assertEqual(self.socket.read(), expected)
 
+    def test_auth(self):
+        '''Appropriately send auth'''
+        expected = ''.join((constants.AUTH, constants.NL, util.pack('hello')))
+        self.assertSent(expected, self.connection.auth, 'hello')
+
     def test_sub(self):
         '''Appropriately sends sub'''
         expected = ''.join((constants.SUB, ' foo bar', constants.NL))
@@ -345,6 +350,13 @@ class TestConnection(MockedSocketTest):
             mock_socket.socket = mock.Mock(side_effect=socket.error)
             self.assertFalse(self.connection.connect())
 
+    def test_ok_response(self):
+        '''Sets our _identify_response to {} if 'OK' is provided'''
+        res = response.Response(
+            self.connection, response.Response.FRAME_TYPE, 'OK')
+        self.connection.identified(res)
+        self.assertEqual(self.connection._identify_response, {})
+
     def test_tls_unsupported(self):
         '''Raises an exception if the server does not support TLS'''
         res = response.Response(self.connection,
@@ -354,12 +366,31 @@ class TestConnection(MockedSocketTest):
             self.assertRaises(exceptions.UnsupportedException,
                 self.connection.identified, res)
 
-    def test_ok_response(self):
-        '''Sets our _identify_response to {} if 'OK' is provided'''
-        res = response.Response(
-            self.connection, response.Response.FRAME_TYPE, 'OK')
-        self.connection.identified(res)
-        self.assertEqual(self.connection._identify_response, {})
+    def test_auth_required_not_provided(self):
+        '''Raises an exception if auth is required but not provided'''
+        res = response.Response(self.connection, response.Response.FRAME_TYPE,
+            json.dumps({'auth_required': True}))
+        self.assertRaises(exceptions.UnsupportedException,
+            self.connection.identified, res)
+
+    def test_auth_required_provided(self):
+        '''Sends the auth message if required and provided'''
+        res = response.Response(self.connection, response.Response.FRAME_TYPE,
+            json.dumps({'auth_required': True}))
+        with mock.patch.object(self.connection, 'auth') as mock_auth:
+            with mock.patch.object(self.connection, '_auth_secret', 'hello'):
+                self.connection.identified(res)
+                mock_auth.assert_called_with('hello')
+
+    def test_auth_provided_not_required(self):
+        '''Logs a warning if you provide auth when none is required'''
+        res = response.Response(self.connection, response.Response.FRAME_TYPE,
+            json.dumps({'auth_required': False}))
+        with mock.patch('nsq.connection.logger') as mock_logger:
+            with mock.patch.object(self.connection, '_auth_secret', 'hello'):
+                self.connection.identified(res)
+                mock_logger.warn.assert_called_with(
+                    'Authentication secret provided but not required')
 
 
 class TestConnectionIntegration(HttpClientIntegrationTest):

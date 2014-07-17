@@ -13,6 +13,7 @@ FRAME_TYPE_MESSAGE = 2
 
 # Command names
 IDENTIFY = 'IDENTIFY'
+AUTH = 'AUTH'
 SUB = 'SUB'
 PUB = 'PUB'
 MPUB = 'MPUB'
