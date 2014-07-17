@@ -181,6 +181,9 @@ class Connection(object):
                     'Auth required but not provided')
             else:
                 self.auth(self._auth_secret)
+                # If we're not talking over TLS, warn the user
+                if not self._identify_response.get('tls_v1', False):
+                    logger.warn('Using AUTH without TLS')
         elif self._auth_secret:
             logger.warn('Authentication secret provided but not required')
         return res
