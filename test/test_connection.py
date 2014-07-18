@@ -4,6 +4,7 @@ import mock
 
 import errno
 import socket
+import ssl
 from collections import deque
 
 from nsq import connection
@@ -81,6 +82,24 @@ class TestConnection(MockedSocketTest):
                 mock_socket.send.side_effect = socket.error(errno.EAGAIN)
                 self.assertEqual(self.connection.flush(), 0)
 
+    def test_flush_would_block_ssl_write(self):
+        '''Honors ssl.SSL_ERROR_WANT_WRITE'''
+        pending = deque(map(str, [1, 2, 3]))
+        with mock.patch.object(self.connection, '_socket') as mock_socket:
+            with mock.patch.object(self.connection, '_pending', pending):
+                mock_socket.send.side_effect = ssl.SSLError(
+                    ssl.SSL_ERROR_WANT_WRITE)
+                self.assertEqual(self.connection.flush(), 0)
+
+    def test_flush_would_block_ssl_read(self):
+        '''Honors ssl.SSL_ERROR_WANT_READ'''
+        pending = deque(map(str, [1, 2, 3]))
+        with mock.patch.object(self.connection, '_socket') as mock_socket:
+            with mock.patch.object(self.connection, '_pending', pending):
+                mock_socket.send.side_effect = ssl.SSLError(
+                    ssl.SSL_ERROR_WANT_READ)
+                self.assertEqual(self.connection.flush(), 0)
+
     def test_flush_socket_error(self):
         '''Re-raises socket non-EAGAIN errors'''
         pending = deque(map(str, [1, 2, 3]))
@@ -134,6 +153,18 @@ class TestConnection(MockedSocketTest):
         '''Returns no results if it would block'''
         with mock.patch.object(self.connection, '_socket') as mock_socket:
             mock_socket.recv.side_effect = socket.error(errno.EAGAIN)
+            self.assertEqual(self.connection.read(), [])
+
+    def test_read_would_block_ssl_write(self):
+        '''Returns no results if it would block on a SSL socket'''
+        with mock.patch.object(self.connection, '_socket') as mock_socket:
+            mock_socket.recv.side_effect = ssl.SSLError(ssl.SSL_ERROR_WANT_WRITE)
+            self.assertEqual(self.connection.read(), [])
+
+    def test_read_would_block_ssl_read(self):
+        '''Returns no results if it would block on a SSL socket'''
+        with mock.patch.object(self.connection, '_socket') as mock_socket:
+            mock_socket.recv.side_effect = ssl.SSLError(ssl.SSL_ERROR_WANT_READ)
             self.assertEqual(self.connection.read(), [])
 
     def test_read_partial(self):
@@ -393,7 +424,7 @@ class TestConnection(MockedSocketTest):
                     'Authentication secret provided but not required')
 
 
-class TestConnectionIntegration(HttpClientIntegrationTest):
+class TestTLSConnectionIntegration(HttpClientIntegrationTest):
     '''We can establish a connection with TLS'''
     def setUp(self):
         HttpClientIntegrationTest.setUp(self)
