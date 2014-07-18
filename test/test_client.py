@@ -106,6 +106,12 @@ class TestClientLookupd(HttpClientIntegrationTest):
         state = [conn.alive() for conn in self.client.connections()]
         self.assertEqual(state, [True])
 
+    def test_auth_secret(self):
+        '''If an auth secret is provided, it passes it to nsqlookupd'''
+        with mock.patch('nsq.client.nsqlookupd.Client') as MockClient:
+            client.Client(topic=self.topic, lookupd_http_addresses=['foo'], auth_secret='hello')
+            MockClient.assert_called_with('foo', access_token='hello')
+
 
 class TestClientMultiple(MockedConnectionTest):
     '''Tests for our client class'''
