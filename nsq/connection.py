@@ -10,6 +10,7 @@ from .response import Response, Message
 
 import errno
 import socket
+import ssl
 import struct
 import sys
 import threading
@@ -20,6 +21,9 @@ class Connection(object):
     '''A socket-based connection to a NSQ server'''
     # Default user agent
     USER_AGENT = 'nsq-py/%s' % __version__
+    # Errors that would block
+    WOULD_BLOCK_ERRS = (
+        errno.EAGAIN, ssl.SSL_ERROR_WANT_WRITE, ssl.SSL_ERROR_WANT_READ)
 
     def __init__(self, host, port, timeout=1.0, reconnection_backoff=None,
         auth_secret=None, **identify):
@@ -224,7 +228,7 @@ class Connection(object):
                 total = sock.send(data)
             except socket.error as exc:
                 # Catch (errno, message)-type socket.errors
-                if exc.args[0] != errno.EAGAIN:
+                if exc.args[0] not in self.WOULD_BLOCK_ERRS:
                     raise
             finally:
                 if total < len(data):
@@ -307,7 +311,7 @@ class Connection(object):
                 return []
             except socket.error as exc:
                 # Catch (errno, message)-type socket.errors
-                if exc.args[0] == errno.EAGAIN:
+                if exc.args[0] in self.WOULD_BLOCK_ERRS:
                     return []
                 else:
                     raise
