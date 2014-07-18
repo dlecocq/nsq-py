@@ -27,7 +27,8 @@ setup(name               = 'nsq-py',
     ],
     install_requires=[
         'requests == 2.2.1',
-        'decorator==3.4.0'
+        'decorator==3.4.0',
+        'url>=0.1.2'
     ],
     **extra
 )

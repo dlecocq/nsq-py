@@ -2,6 +2,7 @@
 
 from decorator import decorator
 import requests
+import url
 
 from .. import json, logger
 from ..exceptions import NSQException
@@ -49,29 +50,24 @@ class ClientException(NSQException):
 
 class BaseClient(object):
     '''Base client class'''
-    def __init__(self, host):
-        '''Host may be a 'host:port' string or a (host, port) tuple'''
-        if isinstance(host, basestring):
-            # Strip off the scheme if any was provideds
-            _, __, hostname = host.partition('//')
-            self._host, _, self._port = hostname.partition(':')
-        elif isinstance(host, (tuple, list)):
-            self._host, self._port = host
+    def __init__(self, target, **params):
+        if isinstance(target, basestring):
+            self._host = url.parse(target)
+        elif isinstance(target, (tuple, list)):
+            self._host = url.parse('http://%s:%s/' % target)
         else:
             raise TypeError('Host must be a string or tuple')
-        assert self._host, 'Must provide a host'
-        assert self._port, 'Must provide a port'
 
     @wrap
     def get(self, path, *args, **kwargs):
         '''GET the provided endpoint'''
-        url = 'http://%s:%s%s' % (self._host, self._port, path)
-        logger.debug('GET %s with %s, %s', url, args, kwargs)
-        return requests.get(url, *args, **kwargs)
+        target = self._host.relative(path).utf8()
+        logger.debug('GET %s with %s, %s', target, args, kwargs)
+        return requests.get(target, *args, **kwargs)
 
     @wrap
     def post(self, path, *args, **kwargs):
         '''POST to the provided endpoint'''
-        url = 'http://%s:%s%s' % (self._host, self._port, path)
-        logger.debug('POST %s with %s, %s', url, args, kwargs)
-        return requests.post(url, *args, **kwargs)
+        target = self._host.relative(path).utf8()
+        logger.debug('POST %s with %s, %s', target, args, kwargs)
+        return requests.post(target, *args, **kwargs)

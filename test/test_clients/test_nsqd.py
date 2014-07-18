@@ -26,7 +26,7 @@ class TestNsqdClient(ClientTest):
             messages = map(str, range(10))
             self.client.mpub('topic', messages)
             post.assert_called_with(
-                '/mpub',
+                'mpub',
                 params={'topic': 'topic', 'binary': True},
                 data=pack(messages)[4:])
 
