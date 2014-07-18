@@ -19,7 +19,7 @@ class Client(object):
     '''A client for talking to NSQ over a connection'''
     def __init__(self,
         lookupd_http_addresses=None, nsqd_tcp_addresses=None, topic=None,
-        timeout=0.1, reconnection_backoff=None, **identify):
+        timeout=0.1, reconnection_backoff=None, auth_secret=None, **identify):
         # If lookupd_http_addresses are provided, so must a topic be.
         if lookupd_http_addresses:
             assert topic
@@ -37,6 +37,7 @@ class Client(object):
 
         # The options to send along with identify when establishing connections
         self._identify_options = identify
+        self._auth_secret = auth_secret
         # A mapping of (host, port) to our nsqd connection objects
         self._connections = {}
 
@@ -115,6 +116,7 @@ class Client(object):
         '''Connect to the provided host, port'''
         conn = connection.Connection(host, port,
             reconnection_backoff=self._reconnection_backoff,
+            auth_secret=self._auth_secret,
             **self._identify_options)
         if conn.alive():
             conn.setblocking(0)

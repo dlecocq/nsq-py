@@ -22,7 +22,7 @@ class Connection(object):
     USER_AGENT = 'nsq-py/%s' % __version__
 
     def __init__(self, host, port, timeout=1.0, reconnection_backoff=None,
-        **identify):
+        auth_secret=None, **identify):
         assert isinstance(host, (str, unicode))
         assert isinstance(port, int)
         self._socket = None
@@ -46,6 +46,9 @@ class Connection(object):
         self._identify_options.setdefault('long_id', socket.getfqdn())
         self._identify_options.setdefault('feature_negotiation', True)
         self._identify_options.setdefault('user_agent', self.USER_AGENT)
+
+        # In support of auth
+        self._auth_secret = auth_secret
 
         # Some settings that may be determined by an identify response
         self.max_rdy_count = sys.maxint
@@ -170,6 +173,19 @@ class Connection(object):
                     'NSQd instance does not support TLS')
             else:
                 self._socket = TLSSocket.wrap_socket(self._socket)
+
+        # Now is the appropriate time to send auth
+        if self._identify_response.get('auth_required', False):
+            if not self._auth_secret:
+                raise UnsupportedException(
+                    'Auth required but not provided')
+            else:
+                self.auth(self._auth_secret)
+                # If we're not talking over TLS, warn the user
+                if not self._identify_response.get('tls_v1', False):
+                    logger.warn('Using AUTH without TLS')
+        elif self._auth_secret:
+            logger.warn('Authentication secret provided but not required')
         return res
 
     def alive(self):
@@ -231,6 +247,10 @@ class Connection(object):
     def identify(self, data):
         '''Send an identification message'''
         return self.send(constants.IDENTIFY, json.dumps(data))
+
+    def auth(self, secret):
+        '''Send an auth secret'''
+        return self.send(constants.AUTH, secret)
 
     def sub(self, topic, channel):
         '''Subscribe to a topic/channel'''
