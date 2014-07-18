@@ -57,11 +57,15 @@ class BaseClient(object):
             self._host = url.parse('http://%s:%s/' % target)
         else:
             raise TypeError('Host must be a string or tuple')
+        self._params = params
 
     @wrap
     def get(self, path, *args, **kwargs):
         '''GET the provided endpoint'''
         target = self._host.relative(path).utf8()
+        params = kwargs.get('params', {})
+        params.update(self._params)
+        kwargs['params'] = params
         logger.debug('GET %s with %s, %s', target, args, kwargs)
         return requests.get(target, *args, **kwargs)
 
@@ -69,5 +73,8 @@ class BaseClient(object):
     def post(self, path, *args, **kwargs):
         '''POST to the provided endpoint'''
         target = self._host.relative(path).utf8()
+        params = kwargs.get('params', {})
+        params.update(self._params)
+        kwargs['params'] = params
         logger.debug('POST %s with %s, %s', target, args, kwargs)
         return requests.post(target, *args, **kwargs)

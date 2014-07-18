@@ -82,7 +82,7 @@ class TestClients(unittest.TestCase):
                 status_code=200, content='{"foo": "bar"}')
             self.client.get('/path', *args, **kwargs)
             MockClass.get.assert_called_with(
-                'http://foo:1/path', *args, **kwargs)
+                'http://foo:1/path', params={}, *args, **kwargs)
 
     def test_post(self):
         '''Posts to the appropriate host with all the provided params'''
@@ -93,7 +93,7 @@ class TestClients(unittest.TestCase):
                 status_code=200, content='{"foo": "bar"}')
             self.client.post('/path', *args, **kwargs)
             MockClass.post.assert_called_with(
-                'http://foo:1/path', *args, **kwargs)
+                'http://foo:1/path', params={}, *args, **kwargs)
 
     def test_prefix_get(self):
         '''Gets from the appropriately-relativized path'''
@@ -102,7 +102,8 @@ class TestClients(unittest.TestCase):
             MockClass.get.return_value = mock.Mock(
                 status_code=200, content='{"foo": "bar"}')
             client.get('path')
-            MockClass.get.assert_called_with('http://foo.com:1/prefix/path')
+            MockClass.get.assert_called_with(
+                'http://foo.com:1/prefix/path', params={})
 
     def test_prefix_post(self):
         '''Posts to the appropriately-relativized path'''
@@ -111,4 +112,25 @@ class TestClients(unittest.TestCase):
             MockClass.post.return_value = mock.Mock(
                 status_code=200, content='{"foo": "bar"}')
             client.post('path')
-            MockClass.post.assert_called_with('http://foo.com:1/prefix/path')
+            MockClass.post.assert_called_with(
+                'http://foo.com:1/prefix/path', params={})
+
+    def test_params_get(self):
+        '''Provides default parameters'''
+        client = http.BaseClient('http://foo.com:1/', a='b')
+        with mock.patch('nsq.http.requests') as MockClass:
+            MockClass.get.return_value = mock.Mock(
+                status_code=200, content='{"foo": "bar"}')
+            client.get('path')
+            MockClass.get.assert_called_with(
+                'http://foo.com:1/path', params={'a': 'b'})
+
+    def test_params_post(self):
+        '''Provides default parameters'''
+        client = http.BaseClient('http://foo.com:1/', a='b')
+        with mock.patch('nsq.http.requests') as MockClass:
+            MockClass.post.return_value = mock.Mock(
+                status_code=200, content='{"foo": "bar"}')
+            client.post('path')
+            MockClass.post.assert_called_with(
+                'http://foo.com:1/path', params={'a': 'b'})

@@ -26,8 +26,11 @@ class Client(object):
 
         # Create clients for each of lookupd instances
         lookupd_http_addresses = lookupd_http_addresses or []
+        params = {}
+        if auth_secret:
+            params['access_token'] = auth_secret
         self._lookupd = [
-            nsqlookupd.Client(host) for host in lookupd_http_addresses]
+            nsqlookupd.Client(host, **params) for host in lookupd_http_addresses]
         self._topic = topic
 
         # The select timeout
