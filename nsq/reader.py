@@ -20,7 +20,8 @@ class Reader(Client):
 
     def added(self, conn):
         '''Subscribe connection and manipulate its RDY state'''
-        self.reconnected(conn)
+        if conn.alive():
+            self.reconnected(conn)
 
     def distribute_ready(self):
         '''Distribute the ready state across all of the connections'''

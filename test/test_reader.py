@@ -37,6 +37,14 @@ class TestReader(HttpClientIntegrationTest):
         self.client.reconnected(connection)
         connection.rdy.assert_called_with(1)
 
+    def test_added_dead(self):
+        '''Does not call reconnected when adding dead connections'''
+        conn = mock.Mock()
+        conn.alive.return_value = False
+        with mock.patch.object(self.client, 'reconnected') as mock_reconnected:
+            self.client.added(conn)
+            self.assertFalse(mock_reconnected.called)
+
     def test_it_checks_max_in_flight(self):
         '''Raises an exception if more connections than in-flight limit'''
         with mock.patch.object(self.client, '_max_in_flight', 0):
