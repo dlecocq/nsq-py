@@ -219,6 +219,12 @@ class TestConnection(MockedSocketTest):
         self.assertEqual(
             self.connection.fileno(), self.socket.fileno())
 
+    def test_fileno_closed(self):
+        '''Raises an exception if the connection's closed'''
+        with mock.patch.object(self.connection, '_socket', None):
+            self.assertRaises(exceptions.ConnectionClosedException,
+                self.connection.fileno)
+
     def test_str_alive(self):
         '''Sane str representation for an alive connection'''
         with mock.patch.object(self.connection, 'alive', return_value=True):

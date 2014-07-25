@@ -8,6 +8,8 @@ from nsq.http import ClientException
 
 from common import HttpClientIntegrationTest, MockedConnectionTest
 from contextlib import contextmanager
+import errno
+import select
 import socket
 
 
@@ -60,6 +62,21 @@ class TestClientNsqd(HttpClientIntegrationTest):
         with self.client.connection_checker() as checker:
             self.assertTrue(checker.is_alive())
         self.assertFalse(checker.is_alive())
+
+    def test_read_closed(self):
+        '''Recovers from reading on a closed connection'''
+        conn = self.client.connections()[0]
+        with mock.patch.object(conn, 'alive', return_value=True):
+            with mock.patch.object(conn, '_socket', None):
+                # This test passes if no exception in raised
+                self.client.read()
+
+    def test_read_select_err(self):
+        '''Recovers from select errors'''
+        with mock.patch('nsq.client.select.select') as mock_select:
+            mock_select.side_effect = select.error(errno.EBADF)
+            # This test passes if no exception is raised
+            self.client.read()
 
 
 class TestClientLookupd(HttpClientIntegrationTest):
@@ -119,21 +136,21 @@ class TestClientMultiple(MockedConnectionTest):
     def readable(self, connections):
         '''With all the connections readable'''
         value = (connections, [], [])
-        with mock.patch.object(client, 'select', return_value=value):
+        with mock.patch('nsq.client.select.select', return_value=value):
             yield
 
     @contextmanager
     def writable(self, connections):
         '''With all the connections writable'''
         value = ([], connections, [])
-        with mock.patch.object(client, 'select', return_value=value):
+        with mock.patch('nsq.client.select.select', return_value=value):
             yield
 
     @contextmanager
     def exceptable(self, connections):
         '''With all the connections exceptable'''
         value = ([], [], connections)
-        with mock.patch.object(client, 'select', return_value=value):
+        with mock.patch('nsq.client.select.select', return_value=value):
             yield
 
     def test_multi_read(self):
