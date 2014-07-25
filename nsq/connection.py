@@ -129,6 +129,7 @@ class Connection(object):
                 if self._socket:
                     self._socket.close()
                 self._socket = None
+                self._pending = deque([])
                 self._reconnnection_counter.failed()
                 return False
 
@@ -145,6 +146,7 @@ class Connection(object):
                 if self._socket:
                     self._socket.close()
             finally:
+                self._pending = deque([])
                 self._socket = None
 
     def socket(self, blocking=True):
