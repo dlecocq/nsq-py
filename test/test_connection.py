@@ -100,6 +100,29 @@ class TestConnection(MockedSocketTest):
                     ssl.SSL_ERROR_WANT_READ)
                 self.assertEqual(self.connection.flush(), 0)
 
+    def test_flush_would_block_ssl_write_buffer(self):
+        '''ssl.SSL_ERROR_WANT_WRITE usesthe same buffer on next send'''
+        pending = deque(map(str, [1, 2, 3]))
+        with mock.patch.object(self.connection, '_pending', pending):
+            with mock.patch.object(self.connection, '_socket') as mock_socket:
+                mock_socket.send.side_effect = ssl.SSLError(
+                    ssl.SSL_ERROR_WANT_WRITE)
+                self.assertFalse(self.connection._out_buffer)
+                self.connection.flush()
+                self.assertEqual(self.connection._out_buffer, '123')
+
+        # With some more pending items, make sure we still only get '123' sent
+        pending = deque(map(str, [4, 5, 6]))
+        with mock.patch.object(self.connection, '_pending', pending):
+            with mock.patch.object(self.connection, '_socket') as mock_socket:
+                mock_socket.send.return_value = 3
+                # The first flush should see the existing buffer
+                self.connection.flush()
+                mock_socket.send.assert_called_with('123')
+                # The second flush should see the pending requests
+                self.connection.flush()
+                mock_socket.send.assert_called_with('456')
+
     def test_flush_socket_error(self):
         '''Re-raises socket non-EAGAIN errors'''
         pending = deque(map(str, [1, 2, 3]))

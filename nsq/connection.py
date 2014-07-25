@@ -36,8 +36,11 @@ class Connection(object):
         self.port = port
         # Whether or not our socket is set to block
         self._blocking = 1
-        # The pending messages we have to send
+        # The pending messages we have to send, and the current buffer we're
+        # sending
         self._pending = deque([])
+        self._out_buffer = ''
+
         self._timeout = timeout
         # The last ready time we set our ready count, current ready count
         self.last_ready_sent = 0
@@ -220,9 +223,15 @@ class Connection(object):
         # calls is very high. Instead, we prefer to glom together many messages
         # into a single string to send at once.
         total = 0
-        pending = self._pending
         for sock in self.socket(blocking=False):
-            data = ''.join(pending.popleft() for _ in xrange(len(pending)))
+            # If there's nothing left in the out buffer, take whatever's in the
+            # pending queue.
+            #
+            # When using SSL, if the socket throws 'SSL_WANT_WRITE', then the
+            # subsequent send requests have to send the same buffer.
+            pending = self._pending
+            data = self._out_buffer or ''.join(
+                pending.popleft() for _ in xrange(len(pending)))
             try:
                 # Try to send as much of the first message as possible
                 total = sock.send(data)
@@ -230,10 +239,13 @@ class Connection(object):
                 # Catch (errno, message)-type socket.errors
                 if exc.args[0] not in self.WOULD_BLOCK_ERRS:
                     raise
+                self._out_buffer = data
+            else:
+                self._out_buffer = None
             finally:
                 if total < len(data):
                     # Save the rest of the message that could not be sent
-                    pending.appendleft(data[total:])
+                    self._pending.appendleft(data[total:])
         return total
 
     def send(self, command, message=None):
