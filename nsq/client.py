@@ -53,8 +53,10 @@ class Client(object):
 
     def discover(self, topic):
         '''Run the discovery mechanism'''
+        logger.info('Discovering on topic %s', topic)
         producers = []
         for lookupd in self._lookupd:
+            logger.info('Discovering on %s', lookupd)
             try:
                 # Find all the current producers on this instance
                 for producer in lookupd.lookup(topic)['producers']:
@@ -83,11 +85,13 @@ class Client(object):
 
     def check_connections(self):
         '''Connect to all the appropriate instances'''
+        logger.info('Checking connections')
         if self._lookupd:
             self.discover(self._topic)
 
         # Make sure we're connected to all the prescribed hosts
         for hostspec in self._nsqd_tcp_addresses:
+            logger.debug('Checking nsqd instance %s', hostspec)
             host, port = hostspec.split(':')
             port = int(port)
             conn = self._connections.get((host, port), None)
@@ -109,11 +113,14 @@ class Client(object):
     def connection_checker(self):
         '''Run periodic reconnection checks'''
         thread = ConnectionChecker(self)
+        logger.info('Starting connection-checker thread')
         thread.start()
         try:
             yield thread
         finally:
+            logger.info('Stopping connection-checker')
             thread.stop()
+            logger.info('Joining connection-checker')
             thread.join()
 
     def connect(self, host, port):
