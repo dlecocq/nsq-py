@@ -10,7 +10,7 @@ from .checker import ConnectionChecker
 
 from contextlib import contextmanager
 import random
-from select import select
+import select
 import socket
 import time
 import threading
@@ -182,8 +182,15 @@ class Client(object):
         # Not all connections need to be written to, so we'll only concern
         # ourselves with those that require writes
         writes = [c for c in connections if c.pending()]
-        readable, writable, exceptable = select(
-            connections, writes, connections, self._timeout)
+        try:
+            readable, writable, exceptable = select.select(
+                connections, writes, connections, self._timeout)
+        except exceptions.ConnectionClosedException:
+            logger.exception('Tried selecting on closed client')
+            return []
+        except select.error:
+            logger.exception('Error running select')
+            return []
 
         # If we returned because the timeout interval passed, log it and return
         if not (readable or writable or exceptable):

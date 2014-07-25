@@ -4,7 +4,7 @@ from . import logger
 from . import util
 from . import json
 from . import __version__
-from .exceptions import UnsupportedException
+from .exceptions import UnsupportedException, ConnectionClosedException
 from .sockets import TLSSocket, SnappySocket, DeflateSocket
 from .response import Response, Message
 
@@ -208,7 +208,9 @@ class Connection(object):
     def fileno(self):
         '''Returns the socket's fileno. This allows us to select on this'''
         for sock in self.socket():
-            return sock.fileno()
+            if sock:
+                return sock.fileno()
+        raise ConnectionClosedException()
 
     def pending(self):
         '''All of the messages waiting to be sent'''
