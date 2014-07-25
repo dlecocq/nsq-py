@@ -12,6 +12,7 @@ from contextlib import contextmanager
 import random
 from select import select
 import socket
+import time
 import threading
 
 
@@ -173,6 +174,9 @@ class Client(object):
         connections = [c for c in self.connections() if c.alive()]
 
         if not connections:
+            # If there are no connections, obviously we return no messages, but
+            # we should wait the duration of the timeout
+            time.sleep(self._timeout)
             return []
 
         # Not all connections need to be written to, so we'll only concern

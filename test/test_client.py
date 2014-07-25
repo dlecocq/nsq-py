@@ -236,6 +236,14 @@ class TestClientMultiple(MockedConnectionTest):
         with mock.patch.object(self.client, 'connections', return_value=[]):
             self.assertEqual(self.client.read(), [])
 
+    def test_read_sleep_no_connections(self):
+        '''Sleeps for timeout if no connections'''
+        with mock.patch.object(self.client, '_timeout', 5):
+            with mock.patch.object(self.client, 'connections', return_value=[]):
+                with mock.patch('nsq.client.time.sleep') as mock_sleep:
+                    self.client.read()
+                    mock_sleep.assert_called_with(self.client._timeout)
+
     def test_random_connection(self):
         '''Yields a random client'''
         found = []
