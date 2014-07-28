@@ -6,6 +6,7 @@ import errno
 import socket
 import ssl
 from collections import deque
+from contextlib import nested
 
 from nsq import connection
 from nsq import constants
@@ -141,11 +142,12 @@ class TestConnection(MockedSocketTest):
         '''Closing the connection flushes all remaining messages'''
         def fake_flush():
             self.connection._pending = False
+            self.connection._fake_flush_called = True
 
         with mock.patch.object(self.connection, 'flush', fake_flush):
             self.connection.send('foo')
             self.connection.close()
-            self.assertEqual(self.connection._pending, False)
+            self.assertTrue(self.connection._fake_flush_called)
 
     def test_magic(self):
         '''Sends the NSQ magic bytes'''
@@ -409,6 +411,57 @@ class TestConnection(MockedSocketTest):
         with mock.patch('nsq.connection.socket') as mock_socket:
             mock_socket.socket = mock.Mock(side_effect=socket.error)
             self.assertFalse(self.connection.connect())
+
+    def test_connect_socket_error_reset(self):
+        '''Invokes reset if the socket raises an error'''
+        self.connection.close()
+        with mock.patch('nsq.connection.socket') as mock_socket:
+            with mock.patch.object(self.connection, '_reset') as mock_reset:
+                mock_socket.socket = mock.Mock(side_effect=socket.error)
+                self.connection.connect()
+                mock_reset.assert_called_with()
+
+    def test_connect_timeout(self):
+        '''Times out when connection instantiation is too slow'''
+        self.connection.close()
+        with mock.patch.object(self.connection, '_read', return_value=[]):
+            with mock.patch.object(self.connection, '_timeout', 0.05):
+                with mock.patch('nsq.connection.socket'):
+                    self.assertFalse(self.connection.connect())
+
+    def test_connect_resets_state(self):
+        '''Upon connection, makes a call to reset its state'''
+        self.connection.close()
+        with mock.patch('nsq.connection.socket'):
+            with mock.patch.object(self.connection, '_reset') as mock_reset:
+                self.connection.connect()
+                mock_reset.assert_called_with()
+
+    def test_close_resets_state(self):
+        '''On closing a connection, a reset its state'''
+        with mock.patch.object(self.connection, '_reset') as mock_reset:
+            self.connection.close()
+            mock_reset.assert_called_with()
+
+    def test_reset(self):
+        '''Reset resets the state variables for the connection'''
+        expected = {
+            '_socket': None,
+            '_pending': deque(),
+            '_out_buffer': '',
+            '_buffer': '',
+            '_identify_response': {},
+            'last_ready_sent': 0,
+            'ready': 0
+        }
+        contexts = [
+            mock.patch.object(self.connection, att, True)
+            for att in expected.keys()]
+        with nested(*contexts):
+            self.connection._reset()
+            for att, val in expected.items():
+                self.assertEqual(getattr(self.connection, att), val,
+                    '%s was not reset' % att)
 
     def test_ok_response(self):
         '''Sets our _identify_response to {} if 'OK' is provided'''
