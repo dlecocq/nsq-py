@@ -4,7 +4,8 @@ from . import logger
 from . import util
 from . import json
 from . import __version__
-from .exceptions import UnsupportedException, ConnectionClosedException
+from .exceptions import (
+    UnsupportedException, ConnectionClosedException, ConnectionTimeoutException)
 from .sockets import TLSSocket, SnappySocket, DeflateSocket
 from .response import Response, Message
 
@@ -13,6 +14,7 @@ import socket
 import ssl
 import struct
 import sys
+import time
 import threading
 from collections import deque
 
@@ -29,24 +31,15 @@ class Connection(object):
         auth_secret=None, **identify):
         assert isinstance(host, (str, unicode))
         assert isinstance(port, int)
-        self._socket = None
-        self._buffer = ''
+
+        self._reset()
+
         # Our host and port
         self.host = host
         self.port = port
         # Whether or not our socket is set to block
         self._blocking = 1
-        # The pending messages we have to send, and the current buffer we're
-        # sending
-        self._pending = deque([])
-        self._out_buffer = ''
-
         self._timeout = timeout
-        # The last ready time we set our ready count, current ready count
-        self.last_ready_sent = 0
-        self.ready = 0
-        # Whether or not we've received an identify response
-        self._identify_response = {}
         # The options to use when identifying
         self._identify_options = dict(identify)
         self._identify_options.setdefault('short_id', socket.gethostname())
@@ -95,11 +88,28 @@ class Connection(object):
         '''Returns True if enough time has passed to attempt a reconnection'''
         return self._reconnnection_counter.ready()
 
+    def _reset(self):
+        '''Reset all of our stateful variables'''
+        self._socket = None
+        # The pending messages we have to send, and the current buffer we're
+        # sending
+        self._pending = deque()
+        self._out_buffer = ''
+        # Our read buffer
+        self._buffer = ''
+        # The identify response we last received from the server
+        self._identify_response = {}
+        # Our ready state
+        self.last_ready_sent = 0
+        self.ready = 0
+
     def connect(self):
         '''Establish a connection'''
         # Don't re-establish existing connections
         if self.alive():
             return True
+
+        self._reset()
 
         # Otherwise, try to connect
         with self._socket_lock:
@@ -112,7 +122,7 @@ class Connection(object):
                 # Set our socket's blocking state to whatever ours is
                 self._socket.setblocking(self._blocking)
                 # Safely write our magic
-                self._pending = deque([constants.MAGIC_V2])
+                self._pending.append(constants.MAGIC_V2)
                 while self.pending():
                     self.flush()
                 # And send our identify command
@@ -121,18 +131,23 @@ class Connection(object):
                     self.flush()
                 self._reconnnection_counter.success()
                 # Wait until we've gotten a response to IDENTIFY, try to read
-                # one
-                responses = []
-                while not responses:
+                # one. Also, only spend up to the provided timeout waiting to
+                # establish the connection.
+                limit = time.time() + self._timeout
+                responses = self._read(1)
+                while (not responses) and (time.time() < limit):
                     responses = self._read(1)
+                if not responses:
+                    raise ConnectionTimeoutException(
+                        'Failed to read identify response within timeout')
                 self.identified(responses[0])
                 return True
             except:
                 logger.exception('Failed to connect')
                 if self._socket:
                     self._socket.close()
-                self._socket = None
                 self._reconnnection_counter.failed()
+                self._reset()
                 return False
 
     def close(self):
@@ -148,7 +163,7 @@ class Connection(object):
                 if self._socket:
                     self._socket.close()
             finally:
-                self._socket = None
+                self._reset()
 
     def socket(self, blocking=True):
         '''Blockingly yield the socket'''

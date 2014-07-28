@@ -5,6 +5,10 @@ class NSQException(StandardError):
     '''Base class for all exceptions in this library'''
 
 
+class ConnectionTimeoutException(NSQException):
+    '''Connection instantiation timed out'''
+
+
 class ConnectionClosedException(NSQException):
     '''Trying to use a closed connection as if it's alive'''
 
