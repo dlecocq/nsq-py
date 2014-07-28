@@ -139,7 +139,7 @@ class Connection(object):
                     responses = self._read(1)
                 if not responses:
                     raise ConnectionTimeoutException(
-                        'Failed to read identify response within timeout')
+                        'Read identify response timed out (%ss)' % self._timeout)
                 self.identified(responses[0])
                 return True
             except:

@@ -6,7 +6,6 @@ import errno
 import socket
 import ssl
 from collections import deque
-from contextlib import nested
 
 from nsq import connection
 from nsq import constants
@@ -432,36 +431,60 @@ class TestConnection(MockedSocketTest):
     def test_connect_resets_state(self):
         '''Upon connection, makes a call to reset its state'''
         self.connection.close()
-        with mock.patch('nsq.connection.socket'):
+        with mock.patch.object(self.connection, '_read', return_value=[]):
             with mock.patch.object(self.connection, '_reset') as mock_reset:
-                self.connection.connect()
-                mock_reset.assert_called_with()
+                with mock.patch.object(self.connection, '_timeout', 0.05):
+                    with mock.patch('nsq.connection.socket'):
+                        self.connection.connect()
+                        mock_reset.assert_called_with()
 
     def test_close_resets_state(self):
-        '''On closing a connection, a reset its state'''
+        '''On closing a connection, reset its state'''
         with mock.patch.object(self.connection, '_reset') as mock_reset:
             self.connection.close()
             mock_reset.assert_called_with()
 
-    def test_reset(self):
-        '''Reset resets the state variables for the connection'''
-        expected = {
-            '_socket': None,
-            '_pending': deque(),
-            '_out_buffer': '',
-            '_buffer': '',
-            '_identify_response': {},
-            'last_ready_sent': 0,
-            'ready': 0
-        }
-        contexts = [
-            mock.patch.object(self.connection, att, True)
-            for att in expected.keys()]
-        with nested(*contexts):
-            self.connection._reset()
-            for att, val in expected.items():
-                self.assertEqual(getattr(self.connection, att), val,
-                    '%s was not reset' % att)
+    def test_reset_socket(self):
+        '''Resets socket'''
+        self.connection._socket = True
+        self.connection._reset()
+        self.assertEqual(self.connection._socket, None)
+
+    def test_reset_pending(self):
+        '''Resets pending'''
+        self.connection._pending = True
+        self.connection._reset()
+        self.assertEqual(self.connection._pending, deque())
+
+    def test_reset_out_buffer(self):
+        '''Resets the outbound buffer'''
+        self.connection._out_buffer = True
+        self.connection._reset()
+        self.assertEqual(self.connection._out_buffer, '')
+
+    def test_reset_buffer(self):
+        '''Resets buffer'''
+        self.connection._buffer = True
+        self.connection._reset()
+        self.assertEqual(self.connection._buffer, '')
+
+    def test_reset_identify_response(self):
+        '''Resets identify_response'''
+        self.connection._identify_response = True
+        self.connection._reset()
+        self.assertEqual(self.connection._identify_response, {})
+
+    def test_reset_last_ready_sent(self):
+        '''Resets last_ready_sent'''
+        self.connection.last_ready_sent = True
+        self.connection._reset()
+        self.assertEqual(self.connection.last_ready_sent, 0)
+
+    def test_reset_ready(self):
+        '''Resets ready'''
+        self.connection.ready = True
+        self.connection._reset()
+        self.assertEqual(self.connection.ready, 0)
 
     def test_ok_response(self):
         '''Sets our _identify_response to {} if 'OK' is provided'''
