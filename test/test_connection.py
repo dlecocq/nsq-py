@@ -422,19 +422,23 @@ class TestConnection(MockedSocketTest):
 
     def test_connect_timeout(self):
         '''Times out when connection instantiation is too slow'''
+        socket = self.connection._socket
         self.connection.close()
         with mock.patch.object(self.connection, '_read', return_value=[]):
             with mock.patch.object(self.connection, '_timeout', 0.05):
-                with mock.patch('nsq.connection.socket'):
+                with mock.patch(
+                    'nsq.connection.socket.socket', return_value=socket):
                     self.assertFalse(self.connection.connect())
 
     def test_connect_resets_state(self):
         '''Upon connection, makes a call to reset its state'''
+        socket = self.connection._socket
         self.connection.close()
         with mock.patch.object(self.connection, '_read', return_value=[]):
             with mock.patch.object(self.connection, '_reset') as mock_reset:
                 with mock.patch.object(self.connection, '_timeout', 0.05):
-                    with mock.patch('nsq.connection.socket'):
+                    with mock.patch(
+                        'nsq.connection.socket.socket', return_value=socket):
                         self.connection.connect()
                         mock_reset.assert_called_with()
 
