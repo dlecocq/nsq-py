@@ -103,10 +103,10 @@ class Connection(object):
         self.last_ready_sent = 0
         self.ready = 0
 
-    def connect(self):
+    def connect(self, force=False):
         '''Establish a connection'''
         # Don't re-establish existing connections
-        if self.alive():
+        if not force and self.alive():
             return True
 
         self._reset()
@@ -333,6 +333,9 @@ class Connection(object):
         # responses. It depends on how the buffering works out. First, read from
         # the socket
         for sock in self.socket():
+            if sock is None:
+                # Race condition. Connection has been closed.
+                return []
             try:
                 packet = sock.recv(4096)
             except socket.timeout:
