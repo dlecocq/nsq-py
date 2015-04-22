@@ -14,6 +14,7 @@ import select
 import socket
 import time
 import threading
+import math
 
 
 class Client(object):
@@ -46,6 +47,8 @@ class Client(object):
         self._connections = {}
 
         self._nsqd_tcp_addresses = nsqd_tcp_addresses or []
+        self.heartbeat_interval = 30 * 1000
+        self.last_recv_timestamp = time.time()
         # A lock for manipulating our connections
         self._lock = threading.RLock()
         # And lastly, instantiate our connections
@@ -108,6 +111,16 @@ class Client(object):
                     if conn.connect():
                         conn.setblocking(0)
                         self.reconnected(conn)
+            else:
+                logger.debug('Checking freshness')
+                now = time.time()
+                time_check = math.ceil(now - self.last_recv_timestamp)
+                if time_check >= ((self.heartbeat_interval * 2) / 1000.0):
+                    if conn.ready_to_reconnect():
+                        logger.info('Reconnecting to %s:%s', host, port)
+                        if conn.connect():
+                            conn.setblocking(0)
+                            self.reconnected(conn)
 
     @contextmanager
     def connection_checker(self):
@@ -213,6 +226,8 @@ class Client(object):
                     if (isinstance(res, Response) and res.data == HEARTBEAT):
                         logger.info('Sending heartbeat to %s', conn)
                         conn.nop()
+                        logger.debug('Setting last_recv_timestamp')
+                        self.last_recv_timestamp = time.time()
                         continue
                     elif isinstance(res, Error):
                         nonfatal = (
@@ -227,6 +242,8 @@ class Client(object):
                                 'Closing %s: %s', conn, res.exception())
                             self.close_connection(conn)
                     responses.append(res)
+                    logger.debug('Setting last_recv_timestamp')
+                    self.last_recv_timestamp = time.time()
             except exceptions.NSQException:
                 logger.exception('Failed to read from %s', conn)
                 self.close_connection(conn)
