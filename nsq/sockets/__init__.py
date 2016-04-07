@@ -9,7 +9,7 @@ from .. import logger
 try:
     from .snappy import SnappySocket
 except ImportError:  # pragma: no cover
-    logger.warn('Snappy compression not supported')
+    logger.debug('Snappy compression not supported')
     SnappySocket = None
 
 
@@ -17,7 +17,7 @@ except ImportError:  # pragma: no cover
 try:
     from .deflate import DeflateSocket
 except ImportError:  # pragma: no cover
-    logger.warn('Deflate compression not supported')
+    logger.debug('Deflate compression not supported')
     DeflateSocket = None
 
 
