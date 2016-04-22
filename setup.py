@@ -29,7 +29,8 @@ setup(name               = 'nsq-py',
     install_requires=[
         'requests',
         'decorator',
-        'url<=0.2.0'
+        'url<=0.2.0',
+        'statsd'
     ],
     tests_requires=[
         'nose',
