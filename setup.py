@@ -1,4 +1,5 @@
 #! /usr/bin/env python
+
 import sys
 from nsq import __version__
 
@@ -26,9 +27,13 @@ setup(name               = 'nsq-py',
         'Operating System :: OS Independent'
     ],
     install_requires=[
-        'requests == 2.2.1',
-        'decorator==3.4.0',
-        'url>=0.1.2'
+        'requests',
+        'decorator',
+        'url<=0.2.0'
+    ],
+    tests_requires=[
+        'nose',
+        'coverage'
     ],
     **extra
 )

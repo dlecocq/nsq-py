@@ -10,3 +10,6 @@ clean:
 test:
 	rm -f .coverage
 	nosetests --exe --cover-package=nsq --with-coverage --cover-branches -v --logging-clear-handlers
+
+requirements:
+	pip freeze | grep -v -e nsq-py > requirements.txt
