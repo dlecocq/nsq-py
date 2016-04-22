@@ -1,0 +1,45 @@
+#! /usr/bin/env python
+'''Send nsqlookupd metrics to statsd.'''
+
+import argparse
+parser = argparse.ArgumentParser()
+parser.add_argument('--nsqlookupd', dest='nsqlookupd', type=str,
+    default='http://localhost:4161/', help='Full URL to nsqlookupd HTTP interface')
+parser.add_argument('--statsd-port', dest='statsd_port', type=int,
+    default=8125, help='The statsd port')
+parser.add_argument('--statsd-host', dest='statsd_host', type=str,
+    default='localhost', help='The statsd host')
+parser.add_argument('--statsd-prefix', dest='statsd_prefix', type=str,
+    default=None, help='Prefix for statsd metrics')
+parser.add_argument('--interval', dest='interval', type=int,
+    default=60, help='Interval (in seconds) between stats collections')
+parser.add_argument('--verbose', dest='verbose', action='store_true',
+    help='Print all the metrics emittied')
+
+args = parser.parse_args()
+
+from nsq.stats import Nsqlookupd
+from nsq.checker import PeriodicThread
+from statsd import StatsClient
+
+statsd = StatsClient(
+    host=args.statsd_host,
+    port=args.statsd_port,
+    prefix=args.statsd_prefix)
+
+nsqlookupd = Nsqlookupd(args.nsqlookupd)
+
+def report():
+    '''Report metrics to statsd.'''
+    for name, value in nsqlookupd.stats:
+        if args.verbose:
+            print '%s => %s' % (name, value)
+        statsd.gauge(name, value)
+
+thread = PeriodicThread(args.interval, report)
+thread.start()
+try:
+    while True:
+        thread.join(1)
+except KeyboardInterrupt:
+    thread.stop()

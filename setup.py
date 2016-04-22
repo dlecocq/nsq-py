@@ -36,5 +36,8 @@ setup(name               = 'nsq-py',
         'nose',
         'coverage'
     ],
+    scripts = [
+        'bin/nsqlookupd-statsd'
+    ],
     **extra
 )
