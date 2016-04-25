@@ -7,5 +7,7 @@ ordereddict==1.1
 pbr==1.9.1
 publicsuffix==1.1.0
 requests==2.9.1
+simplejson==3.8.2
 six==1.10.0
+statsd==3.2.1
 url==0.1.7
