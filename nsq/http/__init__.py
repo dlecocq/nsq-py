@@ -62,7 +62,10 @@ class BaseClient(object):
     @wrap
     def get(self, path, *args, **kwargs):
         '''GET the provided endpoint'''
-        target = self._host.relative(path).utf8()
+        target = self._host.relative(path).utf8
+        if not isinstance(target, basestring):
+            # on older versions of the `url` library, .utf8 is a method, not a property
+            target = target()
         params = kwargs.get('params', {})
         params.update(self._params)
         kwargs['params'] = params
@@ -72,7 +75,10 @@ class BaseClient(object):
     @wrap
     def post(self, path, *args, **kwargs):
         '''POST to the provided endpoint'''
-        target = self._host.relative(path).utf8()
+        target = self._host.relative(path).utf8
+        if not isinstance(target, basestring):
+            # on older versions of the `url` library, .utf8 is a method, not a property
+            target = target()
         params = kwargs.get('params', {})
         params.update(self._params)
         kwargs['params'] = params
