@@ -66,6 +66,14 @@ def consume_message(message):
 
 pool.map(consume_message, reader)
 ```
+Message
+-------
+
+The `Message` [class](https://github.com/dlecocq/nsq-py/blob/master/nsq/response.py#L52) implements the [NSQ events](http://pynsq.readthedocs.io/en/latest/message.html). The following events are available:
+
+* message.fin() - Finished processing message
+* message.req(timeout) - Requeue a message with a specific timeout
+* message.touch() - Reset the timeout for an in-flight message
 
 Closing
 -------
