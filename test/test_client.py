@@ -55,7 +55,7 @@ class TestClientNsqd(HttpClientIntegrationTest):
                 self.client, '_identify_options', {'foo': 'bar'}):
                 self.client.connect('foo', 'bar')
                 MockConnection.assert_called_with('foo', 'bar',
-                    reconnection_backoff=None, auth_secret=None, foo='bar')
+                    reconnection_backoff=None, auth_secret=None, foo='bar', timeout=None)
 
     def test_conection_checker(self):
         '''Spawns and starts a connection checker'''
