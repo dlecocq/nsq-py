@@ -55,7 +55,7 @@ class TestClientNsqd(HttpClientIntegrationTest):
                 self.client, '_identify_options', {'foo': 'bar'}):
                 self.client.connect('foo', 'bar')
                 MockConnection.assert_called_with('foo', 'bar',
-                    reconnection_backoff=None, auth_secret=None, foo='bar')
+                    reconnection_backoff=None, auth_secret=None, foo='bar', timeout=None)
 
     def test_conection_checker(self):
         '''Spawns and starts a connection checker'''
@@ -339,3 +339,15 @@ class TestClientMultiple(MockedConnectionTest):
         with mock.patch.object(self.client, 'reconnected'):
             self.client.check_connections()
             self.client.reconnected.assert_called_with(conn)
+
+
+class TestClientNsqdWithConnectTimeout(HttpClientIntegrationTest):
+    '''Test our client class when a connection timeout is set'''
+    nsqd_ports = (14150,)
+
+    def test_connect_timeout(self):
+        HttpClientIntegrationTest.setUp(self)
+        hosts = ['localhost:%s' % port for port in self.nsqd_ports]
+        connect_timeout = 2.0
+        self.client = client.Client(nsqd_tcp_addresses=hosts, connect_timeout=connect_timeout)
+        self.assertEqual(self.client._connect_timeout, connect_timeout)

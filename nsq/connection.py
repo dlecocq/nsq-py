@@ -27,7 +27,7 @@ class Connection(object):
     WOULD_BLOCK_ERRS = (
         errno.EAGAIN, ssl.SSL_ERROR_WANT_WRITE, ssl.SSL_ERROR_WANT_READ)
 
-    def __init__(self, host, port, timeout=1.0, reconnection_backoff=None,
+    def __init__(self, host, port, timeout=None, reconnection_backoff=None,
         auth_secret=None, **identify):
         assert isinstance(host, (str, unicode))
         assert isinstance(port, int)
@@ -39,7 +39,7 @@ class Connection(object):
         self.port = port
         # Whether or not our socket is set to block
         self._blocking = 1
-        self._timeout = timeout
+        self._timeout = timeout if timeout is not None else 1.0
         # The options to use when identifying
         self._identify_options = dict(identify)
         self._identify_options.setdefault('short_id', socket.gethostname())
