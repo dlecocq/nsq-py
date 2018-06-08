@@ -30,7 +30,11 @@ def json_wrap(function, *args, **kwargs):
     try:
         # Some responses have data = None, but they generally signal a
         # successful API call as well.
-        return json.loads(function(*args, **kwargs).content)['data'] or True
+        response = json.loads(function(*args, **kwargs).content)
+        if 'data' in response:
+            return response['data'] or True
+        else:
+            return response
     except Exception as exc:
         raise ClientException(exc)
 
