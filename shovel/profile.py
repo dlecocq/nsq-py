@@ -50,11 +50,11 @@ def basic(topic='topic', channel='channel', count=1e6, size=10, gevent=False,
     from nsq.http import nsqd
     from nsq.reader import Reader
 
-    print 'Publishing messages...'
+    print('Publishing messages...')
     for batch in grouper(messages(count, size), 1000):
         nsqd.Client('http://localhost:4151').mpub(topic, batch)
 
-    print 'Consuming messages'
+    print('Consuming messages')
     client = Reader(topic, channel, nsqd_tcp_addresses=['localhost:4150'],
         max_in_flight=max_in_flight)
     with closing(client):
@@ -67,8 +67,8 @@ def basic(topic='topic', channel='channel', count=1e6, size=10, gevent=False,
             for message in islice(client, count):
                 message.fin()
         start += time.time()
-    print 'Finished %i messages in %fs (%5.2f messages / second)' % (
-        count, start, count / start)
+    print('Finished %i messages in %fs (%5.2f messages / second)' % (
+        count, start, count / start))
 
 
 @task
@@ -83,5 +83,5 @@ def stats():
 
     mean = sum(values) / len(values)
     variance = sum((val - mean) ** 2 for val in values) / len(values)
-    print '%3i items; mean: %10.5f; std-dev: %10.5f' % (
-        len(values), mean, math.sqrt(variance))
+    print('%3i items; mean: %10.5f; std-dev: %10.5f' % (
+        len(values), mean, math.sqrt(variance)))

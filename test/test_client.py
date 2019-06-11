@@ -264,7 +264,7 @@ class TestClientMultiple(MockedConnectionTest):
     def test_random_connection(self):
         '''Yields a random client'''
         found = []
-        for _ in xrange(20):
+        for _ in range(20):
             with self.client.random_connection() as conn:
                 found.append(conn)
         self.assertEqual(set(found), set(self.client.connections()))

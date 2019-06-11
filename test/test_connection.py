@@ -69,14 +69,14 @@ class TestConnection(MockedSocketTest):
 
     def test_flush_multiple(self):
         '''Flushes as many messages as possible'''
-        pending = deque(['hello'] * 5)
+        pending = deque([b'hello'] * 5)
         with mock.patch.object(self.connection, '_pending', pending):
             self.connection.flush()
             self.assertEqual(len(self.connection.pending()), 0)
 
     def test_flush_would_block(self):
         '''Honors EAGAIN / EWOULDBLOCK'''
-        pending = deque(map(str, [1, 2, 3]))
+        pending = deque([b'1', b'2', b'3'])
         with mock.patch.object(self.connection, '_socket') as mock_socket:
             with mock.patch.object(self.connection, '_pending', pending):
                 mock_socket.send.side_effect = socket.error(errno.EAGAIN)
@@ -84,7 +84,7 @@ class TestConnection(MockedSocketTest):
 
     def test_flush_would_block_ssl_write(self):
         '''Honors ssl.SSL_ERROR_WANT_WRITE'''
-        pending = deque(map(str, [1, 2, 3]))
+        pending = deque([b'1', b'2', b'3'])
         with mock.patch.object(self.connection, '_socket') as mock_socket:
             with mock.patch.object(self.connection, '_pending', pending):
                 mock_socket.send.side_effect = ssl.SSLError(
@@ -93,7 +93,7 @@ class TestConnection(MockedSocketTest):
 
     def test_flush_would_block_ssl_read(self):
         '''Honors ssl.SSL_ERROR_WANT_READ'''
-        pending = deque(map(str, [1, 2, 3]))
+        pending = deque([b'1', b'2', b'3'])
         with mock.patch.object(self.connection, '_socket') as mock_socket:
             with mock.patch.object(self.connection, '_pending', pending):
                 mock_socket.send.side_effect = ssl.SSLError(
@@ -102,30 +102,30 @@ class TestConnection(MockedSocketTest):
 
     def test_flush_would_block_ssl_write_buffer(self):
         '''ssl.SSL_ERROR_WANT_WRITE usesthe same buffer on next send'''
-        pending = deque(map(str, [1, 2, 3]))
+        pending = deque([b'1', b'2', b'3'])
         with mock.patch.object(self.connection, '_pending', pending):
             with mock.patch.object(self.connection, '_socket') as mock_socket:
                 mock_socket.send.side_effect = ssl.SSLError(
                     ssl.SSL_ERROR_WANT_WRITE)
                 self.assertFalse(self.connection._out_buffer)
                 self.connection.flush()
-                self.assertEqual(self.connection._out_buffer, '123')
+                self.assertEqual(self.connection._out_buffer, b'123')
 
         # With some more pending items, make sure we still only get '123' sent
-        pending = deque(map(str, [4, 5, 6]))
+        pending = deque([b'4', b'5', b'6'])
         with mock.patch.object(self.connection, '_pending', pending):
             with mock.patch.object(self.connection, '_socket') as mock_socket:
                 mock_socket.send.return_value = 3
                 # The first flush should see the existing buffer
                 self.connection.flush()
-                mock_socket.send.assert_called_with('123')
+                mock_socket.send.assert_called_with(b'123')
                 # The second flush should see the pending requests
                 self.connection.flush()
-                mock_socket.send.assert_called_with('456')
+                mock_socket.send.assert_called_with(b'456')
 
     def test_flush_socket_error(self):
         '''Re-raises socket non-EAGAIN errors'''
-        pending = deque(map(str, [1, 2, 3]))
+        pending = deque([b'1', b'2', b'3'])
         with mock.patch.object(self.connection, '_socket') as mock_socket:
             with mock.patch.object(self.connection, '_pending', pending):
                 mock_socket.send.side_effect = socket.error('foo')
@@ -134,7 +134,7 @@ class TestConnection(MockedSocketTest):
     def test_eager_flush(self):
         '''Sending on a non-blocking connection does not eagerly flushes'''
         with mock.patch.object(self.connection, 'flush') as mock_flush:
-            self.connection.send('foo')
+            self.connection.send(b'foo')
             mock_flush.assert_not_called()
 
     def test_close_flush(self):
@@ -144,7 +144,7 @@ class TestConnection(MockedSocketTest):
             self.connection._fake_flush_called = True
 
         with mock.patch.object(self.connection, 'flush', fake_flush):
-            self.connection.send('foo')
+            self.connection.send(b'foo')
             self.connection.close()
             self.assertTrue(self.connection._fake_flush_called)
 
@@ -154,11 +154,11 @@ class TestConnection(MockedSocketTest):
 
     def test_identify(self):
         '''The connection sends the identify commands'''
-        expected = ''.join([
+        expected = b''.join([
             constants.MAGIC_V2,
             constants.IDENTIFY,
             constants.NL,
-            util.pack(json.dumps(self.connection._identify_options))])
+            util.pack(json.dumps(self.connection._identify_options).encode())])
         self.assertEqual(self.socket.read(), expected)
 
     def test_read_timeout(self):
@@ -193,26 +193,26 @@ class TestConnection(MockedSocketTest):
 
     def test_read_partial(self):
         '''Returns nothing if it has only read partial results'''
-        self.socket.write('f')
+        self.socket.write(b'f')
         self.assertEqual(self.connection.read(), [])
 
     def test_read_size_partial(self):
         '''Returns one response size is complete, but content is partial'''
-        self.socket.write(response.Response.pack('hello')[:-1])
+        self.socket.write(response.Response.pack(b'hello')[:-1])
         self.assertEqual(self.connection.read(), [])
 
     def test_read_whole(self):
         '''Returns a single message if it has read a complete one'''
-        self.socket.write(response.Response.pack('hello'))
+        self.socket.write(response.Response.pack(b'hello'))
         expected = response.Response(
-            self.connection, constants.FRAME_TYPE_RESPONSE, 'hello')
+            self.connection, constants.FRAME_TYPE_RESPONSE, b'hello')
         self.assertEqual(self.connection.read(), [expected])
 
     def test_read_multiple(self):
         '''Returns multiple responses if available'''
-        self.socket.write(response.Response.pack('hello') * 10)
+        self.socket.write(response.Response.pack(b'hello') * 10)
         expected = response.Response(
-            self.connection, constants.FRAME_TYPE_RESPONSE, 'hello')
+            self.connection, constants.FRAME_TYPE_RESPONSE, b'hello')
         self.assertEqual(self.connection.read(), [expected] * 10)
 
     def test_fileno(self):
@@ -259,8 +259,8 @@ class TestConnection(MockedSocketTest):
         self.socket.read()
         self.connection.identify({})
         self.connection.flush()
-        expected = ''.join(
-            (constants.IDENTIFY, constants.NL, util.pack('{}')))
+        expected = b''.join(
+            (constants.IDENTIFY, constants.NL, util.pack(b'{}')))
         self.assertEqual(self.socket.read(), expected)
 
     def assertSent(self, expected, function, *args, **kwargs):
@@ -272,55 +272,55 @@ class TestConnection(MockedSocketTest):
 
     def test_auth(self):
         '''Appropriately send auth'''
-        expected = ''.join((constants.AUTH, constants.NL, util.pack('hello')))
-        self.assertSent(expected, self.connection.auth, 'hello')
+        expected = b''.join((constants.AUTH, constants.NL, util.pack(b'hello')))
+        self.assertSent(expected, self.connection.auth, b'hello')
 
     def test_sub(self):
         '''Appropriately sends sub'''
-        expected = ''.join((constants.SUB, ' foo bar', constants.NL))
-        self.assertSent(expected, self.connection.sub, 'foo', 'bar')
+        expected = b''.join((constants.SUB, b' foo bar', constants.NL))
+        self.assertSent(expected, self.connection.sub, b'foo', b'bar')
 
     def test_pub(self):
         '''Appropriately sends pub'''
-        expected = ''.join(
-            (constants.PUB, ' foo', constants.NL, util.pack('hello')))
-        self.assertSent(expected, self.connection.pub, 'foo', 'hello')
+        expected = b''.join(
+            (constants.PUB, b' foo', constants.NL, util.pack(b'hello')))
+        self.assertSent(expected, self.connection.pub, b'foo', b'hello')
 
     def test_mpub(self):
         '''Appropriately sends mpub'''
-        expected = ''.join((
-            constants.MPUB, ' foo', constants.NL,
-            util.pack(['hello', 'howdy'])))
-        self.assertSent(expected, self.connection.mpub, 'foo', 'hello', 'howdy')
+        expected = b''.join((
+            constants.MPUB, b' foo', constants.NL,
+            util.pack([b'hello', b'howdy'])))
+        self.assertSent(expected, self.connection.mpub, b'foo', b'hello', b'howdy')
 
     def test_ready(self):
         '''Appropriately sends ready'''
-        expected = ''.join((constants.RDY, ' 5', constants.NL))
+        expected = b''.join((constants.RDY, b' 5', constants.NL))
         self.assertSent(expected, self.connection.rdy, 5)
 
     def test_fin(self):
         '''Appropriately sends fin'''
-        expected = ''.join((constants.FIN, ' message_id', constants.NL))
-        self.assertSent(expected, self.connection.fin, 'message_id')
+        expected = b''.join((constants.FIN, b' message_id', constants.NL))
+        self.assertSent(expected, self.connection.fin, b'message_id')
 
     def test_req(self):
         '''Appropriately sends req'''
-        expected = ''.join((constants.REQ, ' message_id 10', constants.NL))
-        self.assertSent(expected, self.connection.req, 'message_id', 10)
+        expected = b''.join((constants.REQ, b' message_id 10', constants.NL))
+        self.assertSent(expected, self.connection.req, b'message_id', 10)
 
     def test_touch(self):
         '''Appropriately sends touch'''
-        expected = ''.join((constants.TOUCH, ' message_id', constants.NL))
-        self.assertSent(expected, self.connection.touch, 'message_id')
+        expected = b''.join((constants.TOUCH, b' message_id', constants.NL))
+        self.assertSent(expected, self.connection.touch, b'message_id')
 
     def test_cls(self):
         '''Appropriately sends cls'''
-        expected = ''.join((constants.CLS, constants.NL))
+        expected = b''.join((constants.CLS, constants.NL))
         self.assertSent(expected, self.connection.cls)
 
     def test_nop(self):
         '''Appropriately sends nop'''
-        expected = ''.join((constants.NOP, constants.NL))
+        expected = b''.join((constants.NOP, constants.NL))
         self.assertSent(expected, self.connection.nop)
 
     # Some tests very closely aimed at identification
@@ -464,13 +464,13 @@ class TestConnection(MockedSocketTest):
         '''Resets the outbound buffer'''
         self.connection._out_buffer = True
         self.connection._reset()
-        self.assertEqual(self.connection._out_buffer, '')
+        self.assertEqual(self.connection._out_buffer, b'')
 
     def test_reset_buffer(self):
         '''Resets buffer'''
         self.connection._buffer = True
         self.connection._reset()
-        self.assertEqual(self.connection._buffer, '')
+        self.assertEqual(self.connection._buffer, b'')
 
     def test_reset_identify_response(self):
         '''Resets identify_response'''
@@ -529,7 +529,7 @@ class TestConnection(MockedSocketTest):
         with mock.patch('nsq.connection.logger') as mock_logger:
             with mock.patch.object(self.connection, '_auth_secret', 'hello'):
                 self.connection.identified(res)
-                mock_logger.warn.assert_called_with(
+                mock_logger.warning.assert_called_with(
                     'Authentication secret provided but not required')
 
 
@@ -546,10 +546,10 @@ class TestTLSConnectionIntegration(HttpClientIntegrationTest):
 
     def test_basic(self):
         '''Can send and receive things'''
-        self.connection.pub('foo', 'bar')
+        self.connection.pub(b'foo', b'bar')
         self.connection.flush()
         responses = []
         while not responses:
             responses = self.connection.read()
         self.assertEqual(len(responses), 1)
-        self.assertEqual(responses[0].data, 'OK')
+        self.assertEqual(responses[0].data, b'OK')

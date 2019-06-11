@@ -2,6 +2,7 @@ import unittest
 
 import mock
 import uuid
+import six
 import socket
 import struct
 from nsq import response
@@ -13,58 +14,64 @@ class TestResponse(unittest.TestCase):
     '''Test our response class'''
     def test_from_raw_response(self):
         '''Make sure we can construct a raw response'''
-        raw = struct.pack('>l5s', constants.FRAME_TYPE_RESPONSE, 'hello')
+        raw = struct.pack('>l5s', constants.FRAME_TYPE_RESPONSE, b'hello')
         res = response.Response.from_raw(None, raw)
         self.assertEqual(res.__class__, response.Response)
-        self.assertEqual(res.data, 'hello')
+        self.assertEqual(res.data, b'hello')
 
     def test_from_raw_unknown_frame(self):
         '''Raises an exception for unknown frame types'''
-        raw = struct.pack('>l5s', 9042, 'hello')
+        raw = struct.pack('>l5s', 9042, b'hello')
         self.assertRaises(TypeError, response.Response.from_raw, None, raw)
 
     def test_str(self):
         '''Has a reasonable string value'''
-        raw = struct.pack('>l5s', constants.FRAME_TYPE_RESPONSE, 'hello')
+        raw = struct.pack('>l5s', constants.FRAME_TYPE_RESPONSE, b'hello')
         res = response.Response.from_raw(None, raw)
-        self.assertEqual(str(res), 'Response - hello')
+        if six.PY2:
+            self.assertEqual(str(res), 'Response - hello')
+        else:
+            self.assertEqual(str(res), "Response - b'hello'")
 
     def test_pack(self):
         '''Can pack itself up'''
-        packed = response.Response.pack('hello')[4:]
+        packed = response.Response.pack(b'hello')[4:]
         unpacked = response.Response.from_raw(None, packed)
         self.assertIsInstance(unpacked, response.Response)
-        self.assertEqual(unpacked.data, 'hello')
+        self.assertEqual(unpacked.data, b'hello')
 
 
 class TestError(unittest.TestCase):
     '''Test our error response class'''
     def test_from_raw_error(self):
         '''Can identify an error type'''
-        raw = struct.pack('>l5s', constants.FRAME_TYPE_ERROR, 'hello')
+        raw = struct.pack('>l5s', constants.FRAME_TYPE_ERROR, b'hello')
         res = response.Response.from_raw(None, raw)
         self.assertEqual(res.__class__, response.Error)
-        self.assertEqual(res.data, 'hello')
+        self.assertEqual(res.data, b'hello')
 
     def test_str(self):
         '''Has a reasonable string value'''
-        raw = struct.pack('>l5s', constants.FRAME_TYPE_ERROR, 'hello')
+        raw = struct.pack('>l5s', constants.FRAME_TYPE_ERROR, b'hello')
         res = response.Response.from_raw(None, raw)
-        self.assertEqual(str(res), 'Error - hello')
+        if six.PY2:
+            self.assertEqual(str(res), 'Error - hello')
+        else:
+            self.assertEqual(str(res), "Error - b'hello'")
 
     def test_find(self):
         '''Can correctly identify the appropriate exception'''
         expected = {
-            'E_INVALID': exceptions.InvalidException,
-            'E_BAD_BODY': exceptions.BadBodyException,
-            'E_BAD_TOPIC': exceptions.BadTopicException,
-            'E_BAD_CHANNEL': exceptions.BadChannelException,
-            'E_BAD_MESSAGE': exceptions.BadMessageException,
-            'E_PUB_FAILED': exceptions.PubFailedException,
-            'E_MPUB_FAILED': exceptions.MpubFailedException,
-            'E_FIN_FAILED': exceptions.FinFailedException,
-            'E_REQ_FAILED': exceptions.ReqFailedException,
-            'E_TOUCH_FAILED': exceptions.TouchFailedException
+            b'E_INVALID': exceptions.InvalidException,
+            b'E_BAD_BODY': exceptions.BadBodyException,
+            b'E_BAD_TOPIC': exceptions.BadTopicException,
+            b'E_BAD_CHANNEL': exceptions.BadChannelException,
+            b'E_BAD_MESSAGE': exceptions.BadMessageException,
+            b'E_PUB_FAILED': exceptions.PubFailedException,
+            b'E_MPUB_FAILED': exceptions.MpubFailedException,
+            b'E_FIN_FAILED': exceptions.FinFailedException,
+            b'E_REQ_FAILED': exceptions.ReqFailedException,
+            b'E_TOUCH_FAILED': exceptions.TouchFailedException
         }
         for key, klass in expected.items():
             self.assertEqual(response.Error.find(key), klass)
@@ -75,34 +82,40 @@ class TestError(unittest.TestCase):
 
     def test_exception(self):
         '''Can correctly raise the appropriate exception'''
-        raw = struct.pack('>l13s', constants.FRAME_TYPE_ERROR, 'E_INVALID foo')
+        raw = struct.pack('>l13s', constants.FRAME_TYPE_ERROR, b'E_INVALID foo')
         res = response.Response.from_raw(None, raw)
         exc = res.exception()
         self.assertIsInstance(exc, exceptions.InvalidException)
-        self.assertEqual(exc.message, 'foo')
+        if six.PY2:
+            self.assertEqual(str(exc), 'foo')
+        else:
+            self.assertEqual(str(exc), "b'foo'")
 
     def test_pack(self):
         '''Can pack itself up'''
-        packed = response.Error.pack('hello')[4:]
+        packed = response.Error.pack(b'hello')[4:]
         unpacked = response.Response.from_raw(None, packed)
         self.assertIsInstance(unpacked, response.Error)
-        self.assertEqual(unpacked.data, 'hello')
+        self.assertEqual(unpacked.data, b'hello')
 
 
 class TestMessage(unittest.TestCase):
     '''Test our message case'''
     def setUp(self):
-        self.id = uuid.uuid4().hex[:16]
+        self.id = uuid.uuid4().hex[:16].encode()
         self.timestamp = 0
         self.attempt = 1
-        self.body = 'hello'
+        self.body = b'hello'
         self.packed = struct.pack('>qH16s5s', 0, 1, self.id, self.body)
         self.response = response.Response.from_raw(mock.Mock(),
             struct.pack('>l31s', constants.FRAME_TYPE_MESSAGE, self.packed))
 
     def test_str(self):
         '''Has a reasonable string value'''
-        self.assertEqual(str(self.response), 'Message - 0 1 %s hello' % self.id)
+        if six.PY2:
+            self.assertEqual(str(self.response), 'Message - 0 1 {} hello'.format(self.id))
+        else:
+            self.assertEqual(str(self.response), "Message - 0 1 {!r} b'hello'".format(self.id))
 
     def test_from_raw_message(self):
         '''Can identify a message type'''

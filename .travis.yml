@@ -1,6 +1,7 @@
 language: python
 python:
   - "2.7"
+  - "3.6"
 env:
   - NSQ_VERSION=0.2.26
 # Get some pre-requisites

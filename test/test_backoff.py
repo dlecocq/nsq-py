@@ -43,7 +43,7 @@ class TestConstant(unittest.TestCase):
 
     def test_constant(self):
         '''Always gives the same result'''
-        for i in xrange(100):
+        for i in range(100):
             self.assertEqual(self.backoff.backoff(0), self.backoff.backoff(i))
 
 
@@ -54,7 +54,7 @@ class TestExponential(unittest.TestCase):
         base = 5
         one = backoff.Exponential(base, 1)
         two = backoff.Exponential(base, 2)
-        for i in xrange(10):
+        for i in range(10):
             self.assertEqual(one.backoff(i) * 2, two.backoff(i))
 
     def test_constant(self):
@@ -62,7 +62,7 @@ class TestExponential(unittest.TestCase):
         base = 5
         four = backoff.Exponential(base, c=4)
         zero = backoff.Exponential(base)
-        for i in xrange(10):
+        for i in range(10):
             self.assertEqual(zero.backoff(i) + 4, four.backoff(i))
 
     def test_base(self):
@@ -94,6 +94,7 @@ class TestAttemptCounter(unittest.TestCase):
     '''Test the attempt counter'''
     def setUp(self):
         self.backoff = mock.Mock()
+        self.backoff.backoff.return_value = 9001
         self.counter = backoff.AttemptCounter(self.backoff)
 
     def test_sleep(self):
