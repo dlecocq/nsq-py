@@ -10,8 +10,8 @@ class HttpClientIntegrationTest(IntegrationTest):
     nsqlookup_port = 14160
 
     def setUp(self):
-        self.topic = 'test-topic'
-        self.channel = 'test-channel'
+        self.topic = b'test-topic'
+        self.channel = b'test-channel'
         self.nsqd = nsqd.Client('http://localhost:14151')
         self.nsqlookupd = nsqlookupd.Client('http://localhost:14161')
 

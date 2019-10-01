@@ -44,7 +44,7 @@ class TestPeriodicThread(unittest.TestCase):
         '''The thread survives exceptions'''
         def callback():
             '''Raise an exception'''
-            raise StandardError('foo')
+            raise Exception('foo')
 
         with mock.patch('nsq.checker.logger') as mock_logger:
             thread = PeriodicThread(0.01, callback)

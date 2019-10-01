@@ -54,7 +54,7 @@ class TestReader(HttpClientIntegrationTest):
         '''It distributes RDY with util.distribute'''
         with mock.patch('nsq.reader.distribute') as mock_distribute:
             counts = range(10)
-            connections = [mock.Mock() for _ in counts]
+            connections = [mock.Mock(max_rdy_count=100) for _ in counts]
             mock_distribute.return_value = zip(counts, connections)
             self.client.distribute_ready()
             for count, connection in zip(counts, connections):
@@ -62,9 +62,9 @@ class TestReader(HttpClientIntegrationTest):
 
     def test_it_ignores_dead_connections(self):
         '''It does not distribute RDY state to dead connections'''
-        dead = mock.Mock()
+        dead = mock.Mock(max_rdy_count=100)
         dead.alive.return_value = False
-        alive = mock.Mock()
+        alive = mock.Mock(max_rdy_count=100)
         alive.alive.return_value = True
         with mock.patch.object(
             self.client, 'connections', return_value=[alive, dead]):
@@ -125,34 +125,34 @@ class TestReader(HttpClientIntegrationTest):
     def test_iter(self):
         '''The client can be used as an iterator'''
         iterator = iter(self.client)
-        message_id = uuid.uuid4().hex[0:16]
-        packed = response.Message.pack(0, 0, message_id, 'hello')
+        message_id = uuid.uuid4().hex[0:16].encode()
+        packed = response.Message.pack(0, 0, message_id, b'hello')
         messages = [response.Message(None, None, packed) for _ in range(10)]
         with mock.patch.object(self.client, 'read', return_value=messages):
-            found = [iterator.next() for _ in range(10)]
+            found = [next(iterator) for _ in range(10)]
             self.assertEqual(messages, found)
 
     def test_iter_repeated_read(self):
         '''Repeatedly calls read in iterator mode'''
         iterator = iter(self.client)
-        message_id = uuid.uuid4().hex[0:16]
-        packed = response.Message.pack(0, 0, message_id, 'hello')
+        message_id = uuid.uuid4().hex[0:16].encode()
+        packed = response.Message.pack(0, 0, message_id, b'hello')
         messages = [response.Message(None, None, packed) for _ in range(10)]
         for message in messages:
             with mock.patch.object(self.client, 'read', return_value=[message]):
-                self.assertEqual(iterator.next(), message)
+                self.assertEqual(next(iterator), message)
 
     def test_skip_non_messages(self):
         '''Skips all non-messages'''
         iterator = iter(self.client)
-        message_id = uuid.uuid4().hex[0:16]
-        packed = response.Message.pack(0, 0, message_id, 'hello')
+        message_id = uuid.uuid4().hex[0:16].encode()
+        packed = response.Message.pack(0, 0, message_id, b'hello')
         messages = [response.Message(None, None, packed) for _ in range(10)]
-        packed = response.Response.pack('hello')
+        packed = response.Response.pack(b'hello')
         responses = [
             response.Response(None, None, packed) for _ in range(10)] + messages
         with mock.patch.object(self.client, 'read', return_value=responses):
-            found = [iterator.next() for _ in range(10)]
+            found = [next(iterator) for _ in range(10)]
             self.assertEqual(messages, found)
 
     def test_honors_max_rdy_count(self):
@@ -164,9 +164,9 @@ class TestReader(HttpClientIntegrationTest):
 
     def test_read(self):
         '''Can receive a message in a basic way'''
-        self.nsqd.pub(self.topic, 'hello')
-        message = iter(self.client).next()
-        self.assertEqual(message.body, 'hello')
+        self.nsqd.pub(self.topic, b'hello')
+        message = next(iter(self.client))
+        self.assertEqual(message.body, b'hello')
 
     def test_close_redistribute(self):
         '''Redistributes rdy count when a connection is closed'''

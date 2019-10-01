@@ -156,7 +156,7 @@ class Client(object):
     def connections(self):
         '''Safely return a list of all our connections'''
         with self._lock:
-            return self._connections.values()
+            return list(self._connections.values())
 
     def added(self, conn):
         '''Hook into when a connection has been added'''
@@ -180,7 +180,7 @@ class Client(object):
         try:
             self.close_connection(found)
         except Exception as exc:
-            logger.warn('Failed to close %s: %s', connection, exc)
+            logger.warning('Failed to close %s: %s', connection, exc)
         return found
 
     def close_connection(self, connection):

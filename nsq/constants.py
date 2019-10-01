@@ -1,10 +1,10 @@
 '''Contstants for NSQ'''
 
 # NSQ Magic
-MAGIC_V2 = '  V2'
+MAGIC_V2 = b'  V2'
 
 # The newline character
-NL = '\n'
+NL = b'\n'
 
 # Response
 FRAME_TYPE_RESPONSE = 0
@@ -12,17 +12,17 @@ FRAME_TYPE_ERROR = 1
 FRAME_TYPE_MESSAGE = 2
 
 # Command names
-IDENTIFY = 'IDENTIFY'
-AUTH = 'AUTH'
-SUB = 'SUB'
-PUB = 'PUB'
-MPUB = 'MPUB'
-RDY = 'RDY'
-FIN = 'FIN'
-REQ = 'REQ'
-TOUCH = 'TOUCH'
-CLS = 'CLS'
-NOP = 'NOP'
+IDENTIFY = b'IDENTIFY'
+AUTH = b'AUTH'
+SUB = b'SUB'
+PUB = b'PUB'
+MPUB = b'MPUB'
+RDY = b'RDY'
+FIN = b'FIN'
+REQ = b'REQ'
+TOUCH = b'TOUCH'
+CLS = b'CLS'
+NOP = b'NOP'
 
 # Heartbeat text
-HEARTBEAT = '_heartbeat_'
+HEARTBEAT = b'_heartbeat_'

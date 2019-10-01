@@ -17,6 +17,7 @@ import sys
 import time
 import threading
 from collections import deque
+import six
 
 
 class Connection(object):
@@ -29,8 +30,8 @@ class Connection(object):
 
     def __init__(self, host, port, timeout=None, reconnection_backoff=None,
         auth_secret=None, **identify):
-        assert isinstance(host, (str, unicode))
-        assert isinstance(port, int)
+        assert isinstance(host, six.string_types), host
+        assert isinstance(port, int), port
 
         self._reset()
 
@@ -51,7 +52,7 @@ class Connection(object):
         self._auth_secret = auth_secret
 
         # Some settings that may be determined by an identify response
-        self.max_rdy_count = sys.maxint
+        self.max_rdy_count = sys.maxsize
 
         # Check for any options we don't support
         disallowed = []
@@ -94,9 +95,9 @@ class Connection(object):
         # The pending messages we have to send, and the current buffer we're
         # sending
         self._pending = deque()
-        self._out_buffer = ''
+        self._out_buffer = b''
         # Our read buffer
-        self._buffer = ''
+        self._buffer = b''
         # The identify response we last received from the server
         self._identify_response = {}
         # Our ready state
@@ -183,7 +184,7 @@ class Connection(object):
             self._identify_response = res.data
             logger.info('Got identify response: %s', res.data)
         except:
-            logger.warn('Server does not support feature negotiation')
+            logger.warning('Server does not support feature negotiation')
             self._identify_response = {}
 
         # Save our max ready count unless it's not provided
@@ -205,9 +206,9 @@ class Connection(object):
                 self.auth(self._auth_secret)
                 # If we're not talking over TLS, warn the user
                 if not self._identify_response.get('tls_v1', False):
-                    logger.warn('Using AUTH without TLS')
+                    logger.warning('Using AUTH without TLS')
         elif self._auth_secret:
-            logger.warn('Authentication secret provided but not required')
+            logger.warning('Authentication secret provided but not required')
         return res
 
     def alive(self):
@@ -247,8 +248,8 @@ class Connection(object):
             # When using SSL, if the socket throws 'SSL_WANT_WRITE', then the
             # subsequent send requests have to send the same buffer.
             pending = self._pending
-            data = self._out_buffer or ''.join(
-                pending.popleft() for _ in xrange(len(pending)))
+            data = self._out_buffer or b''.join(
+                pending.popleft() for _ in range(len(pending)))
             try:
                 # Try to send as much of the first message as possible
                 total = sock.send(data)
@@ -279,7 +280,7 @@ class Connection(object):
 
     def identify(self, data):
         '''Send an identification message'''
-        return self.send(constants.IDENTIFY, json.dumps(data))
+        return self.send(constants.IDENTIFY, json.dumps(data).encode('UTF-8'))
 
     def auth(self, secret):
         '''Send an auth secret'''
@@ -287,33 +288,33 @@ class Connection(object):
 
     def sub(self, topic, channel):
         '''Subscribe to a topic/channel'''
-        return self.send(' '.join((constants.SUB, topic, channel)))
+        return self.send(b' '.join((constants.SUB, topic, channel)))
 
     def pub(self, topic, message):
         '''Publish to a topic'''
-        return self.send(' '.join((constants.PUB, topic)), message)
+        return self.send(b' '.join((constants.PUB, topic)), message)
 
     def mpub(self, topic, *messages):
         '''Publish multiple messages to a topic'''
-        return self.send(constants.MPUB + ' ' + topic, messages)
+        return self.send(constants.MPUB + b' ' + topic, messages)
 
     def rdy(self, count):
         '''Indicate that you're ready to receive'''
         self.ready = count
         self.last_ready_sent = count
-        return self.send(constants.RDY + ' ' + str(count))
+        return self.send(constants.RDY + b' ' + six.text_type(count).encode())
 
     def fin(self, message_id):
         '''Indicate that you've finished a message ID'''
-        return self.send(constants.FIN + ' ' + message_id)
+        return self.send(constants.FIN + b' ' + message_id)
 
     def req(self, message_id, timeout):
         '''Re-queue a message'''
-        return self.send(constants.REQ + ' ' + message_id + ' ' + str(timeout))
+        return self.send(constants.REQ + b' ' + message_id + b' ' + six.text_type(timeout).encode())
 
     def touch(self, message_id):
         '''Reset the timeout for an in-flight message'''
-        return self.send(constants.TOUCH + ' ' + message_id)
+        return self.send(constants.TOUCH + b' ' + message_id)
 
     def cls(self):
         '''Close the connection cleanly'''

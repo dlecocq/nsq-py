@@ -40,10 +40,9 @@ class Nsqlookupd(object):
             'backend_depth',
             'requeue_count'
         )
-        
+
         for host, stats in self.merged.items():
             for topic, stats in stats.get('topics', {}).items():
-                prefix = 'host.%s.topic.%s' % (host, topic)
                 for key in topic_keys:
                     value = int(stats.get(key, -1))
                     yield (
@@ -61,7 +60,7 @@ class Nsqlookupd(object):
                         value,
                         True
                     )
-                
+
                 for chan, stats in stats.get('channels', {}).items():
                     data = {
                         key: int(stats.get(key, -1)) for key in channel_keys

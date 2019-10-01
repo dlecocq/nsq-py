@@ -10,15 +10,15 @@ class MockSocket(mock.Mock):
     '''The server-side socket. Read/write are from the server's perspective'''
     def __init__(self, *_, **__):
         mock.Mock.__init__(self)
-        self._to_client_buffer = ''
-        self._to_server_buffer = ''
+        self._to_client_buffer = b''
+        self._to_server_buffer = b''
 
     # From the server's perspective
     def write(self, message):
         self._to_client_buffer += message
 
     def read(self):
-        data, self._to_server_buffer = self._to_server_buffer, ''
+        data, self._to_server_buffer = self._to_server_buffer, b''
         return data
 
     # From the client's perspective
@@ -45,9 +45,9 @@ class MockSocket(mock.Mock):
     def identify(self, spec=None):
         '''Write out the identify response'''
         if spec:
-            self.response(json.dumps(spec))
+            self.response(json.dumps(spec).encode('UTF-8'))
         else:
-            self.response('OK')
+            self.response(b'OK')
 
 
 class MockedSocketTest(unittest.TestCase):

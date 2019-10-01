@@ -18,11 +18,11 @@ class TestNsqlookupdClient(HttpClientIntegrationTest):
 
     def test_topics(self):
         '''Can get all the topics this instance knows about'''
-        self.assertIn(self.topic, self.nsqlookupd.topics()['topics'])
+        self.assertIn(self.topic.decode(), self.nsqlookupd.topics()['topics'])
 
     def test_channels(self):
         '''Can get all the channels in the provided topic'''
-        self.assertIn(self.channel,
+        self.assertIn(self.channel.decode(),
             self.nsqlookupd.channels(self.topic)['channels'])
 
     def test_nodes(self):
@@ -55,5 +55,5 @@ class TestNsqlookupdClient(HttpClientIntegrationTest):
 
     def test_debug(self):
         '''Can access debug information'''
-        key = 'channel:%s:%s' % (self.topic, self.channel)
+        key = 'channel:%s:%s' % (self.topic.decode(), self.channel.decode())
         self.assertIn(key, self.nsqlookupd.debug())

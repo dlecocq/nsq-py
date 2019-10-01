@@ -1,6 +1,7 @@
 import inspect
 import struct
 
+import six
 from .constants import FRAME_TYPE_RESPONSE, FRAME_TYPE_MESSAGE, FRAME_TYPE_ERROR
 from . import exceptions
 
@@ -114,7 +115,7 @@ class Message(Response):
                     self.req(self.delay())
                 except socket.error:
                     self.connection.close()
-            raise typ, value, trace
+            six.reraise(typ, value, trace)
         else:
             if not self.processed:
                 try:
@@ -146,5 +147,5 @@ class Error(Response):
 
     def exception(self):
         '''Return an instance of the corresponding exception'''
-        code, _, message = self.data.partition(' ')
+        code, _, message = self.data.partition(b' ')
         return self.find(code)(message)

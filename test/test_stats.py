@@ -1,10 +1,9 @@
 '''Test our stats utility'''
 
-import mock
 import os
-import unittest
 
 import simplejson as json
+import six
 
 from nsq.stats import Nsqlookupd
 from nsq.http import nsqd
@@ -39,15 +38,15 @@ class TestStats(IntegrationTest):
         ]
         for topic in topics:
             client.create_topic(topic)
-            client.mpub(topic, map(str, range(len(topic))))
+            client.mpub(topic, [six.text_type(i).encode() for i in range(len(topic))])
         client.create_channel('topic-with-channels', 'channel')
 
         # Create a topic and messages on the second nsqd isntance
         client = nsqd.Client('http://localhost:14153')
         client.create_topic('topic-on-both-instances')
-        client.mpub(topic, map(str, range(10)))
+        client.mpub(topic, [six.text_type(i).encode() for i in range(10)])
 
         # Check the stats
         self.assertFixture(
             'test/fixtures/test_stats/TestStats/stats',
-            map(list, Nsqlookupd('http://localhost:14161').stats))
+            [list(x) for x in Nsqlookupd('http://localhost:14161').stats])

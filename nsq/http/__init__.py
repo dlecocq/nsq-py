@@ -2,7 +2,8 @@
 
 from decorator import decorator
 import requests
-import url
+import six
+from six.moves.urllib_parse import urlsplit, urlunsplit, urljoin
 
 from .. import json, logger
 from ..exceptions import NSQException
@@ -43,7 +44,7 @@ def json_wrap(function, *args, **kwargs):
 def ok_check(function, *args, **kwargs):
     '''Ensure that the response body is OK'''
     req = function(*args, **kwargs)
-    if req.content.lower() != 'ok':
+    if req.content.lower() != b'ok':
         raise ClientException(req.content)
     return req.content
 
@@ -52,13 +53,18 @@ class ClientException(NSQException):
     '''An exception class for all client errors'''
 
 
+def _relative(split_result, path):
+    new_split = split_result._replace(path=urljoin(split_result.path, path))
+    return urlunsplit(new_split)
+
+
 class BaseClient(object):
     '''Base client class'''
     def __init__(self, target, **params):
-        if isinstance(target, basestring):
-            self._host = url.parse(target)
+        if isinstance(target, six.string_types):
+            self._host = urlsplit(target)
         elif isinstance(target, (tuple, list)):
-            self._host = url.parse('http://%s:%s/' % target)
+            self._host = urlsplit('http://%s:%s/' % target)
         else:
             raise TypeError('Host must be a string or tuple')
         self._params = params
@@ -66,10 +72,7 @@ class BaseClient(object):
     @wrap
     def get(self, path, *args, **kwargs):
         '''GET the provided endpoint'''
-        target = self._host.relative(path).utf8
-        if not isinstance(target, basestring):
-            # on older versions of the `url` library, .utf8 is a method, not a property
-            target = target()
+        target = _relative(self._host, path)
         params = kwargs.get('params', {})
         params.update(self._params)
         kwargs['params'] = params
@@ -79,10 +82,7 @@ class BaseClient(object):
     @wrap
     def post(self, path, *args, **kwargs):
         '''POST to the provided endpoint'''
-        target = self._host.relative(path).utf8
-        if not isinstance(target, basestring):
-            # on older versions of the `url` library, .utf8 is a method, not a property
-            target = target()
+        target = _relative(self._host, path)
         params = kwargs.get('params', {})
         params.update(self._params)
         kwargs['params'] = params

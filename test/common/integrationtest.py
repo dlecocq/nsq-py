@@ -1,10 +1,11 @@
 import unittest
 
-from contextlib import contextmanager, nested
+from contextlib import contextmanager
 import os
 import subprocess
 import time
 
+import contextlib2
 from nsq import logger
 from nsq.http import nsqd, nsqlookupd, ClientException
 
@@ -103,8 +104,10 @@ class IntegrationTest(unittest.TestCase):
         instances = (
             [Nsqlookupd(cls.nsqlookupd_port)] +
             [Nsqd(p, cls.nsqlookupd_port) for p in cls.nsqd_ports])
-        cls._context = nested(*[i.run() for i in instances])
+        cls._context = contextlib2.ExitStack()
         cls._context.__enter__()
+        for i in instances:
+            cls._context.enter_context(i.run())
 
     @classmethod
     def tearDownClass(cls):

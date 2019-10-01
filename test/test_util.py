@@ -10,19 +10,19 @@ class TestPack(unittest.TestCase):
     '''Test our packing utility'''
     def test_string(self):
         '''Give it a low-ball test'''
-        message = 'hello'
+        message = b'hello'
         self.assertEqual(util.pack(message), struct.pack('>l5s', 5, message))
 
     def test_iterable(self):
         '''Make sure it handles iterables'''
-        messages = ['hello'] * 10
-        packed = struct.pack('>l5s', 5, 'hello')
+        messages = [b'hello'] * 10
+        packed = struct.pack('>l5s', 5, b'hello')
         expected = struct.pack('>ll90s', 94, 10, packed * 10)
         self.assertEqual(util.pack(messages), expected)
 
     def test_iterable_of_iterables(self):
         '''Should complain in the event of nested iterables'''
-        messages = [['hello'] * 5] * 10
+        messages = [[b'hello'] * 5] * 10
         self.assertRaises(TypeError, util.pack, messages)
 
 
@@ -47,7 +47,7 @@ class TestDistribute(unittest.TestCase):
     '''Test the distribute'''
     def counts(self, total, objects):
         '''Return a list of the counts returned by distribute'''
-        return zip(*util.distribute(total, objects))[0]
+        return tuple(zip(*util.distribute(total, objects)))[0]
 
     def count(self, total, objects):
         '''Return the sum of the counts'''
@@ -63,8 +63,13 @@ class TestDistribute(unittest.TestCase):
 
     def test_min_max(self):
         '''The minimum and maximum should be within 1'''
-        for num in xrange(1, 50):
+        for num in range(1, 50):
             objects = range(num)
-            for total in xrange(1, 50):
+            for total in range(1, 50):
                 counts = self.counts(total, objects)
                 self.assertLessEqual(max(counts) - min(counts), 1)
+
+    def test_distribute_types(self):
+        '''Distribute should always return integers'''
+        parts = tuple(util.distribute(1000, (1, 2, 3)))
+        self.assertEqual(parts, ((333, 1), (333, 2), (334, 3)))

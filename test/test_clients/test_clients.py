@@ -64,8 +64,8 @@ class TestClients(unittest.TestCase):
 
     def test_ok_check(self):
         '''Passes through the OK response'''
-        self.result.content = 'OK'
-        self.assertEqual('OK', http.ok_check(self.function)())
+        self.result.content = b'OK'
+        self.assertEqual(b'OK', http.ok_check(self.function)())
 
     def test_ok_check_raises_exception(self):
         '''Raises an exception if the respons is not OK'''

@@ -1,13 +1,10 @@
 #! /usr/bin/env python
 
-import sys
 from nsq import __version__
 
 extra = {}
 
 from setuptools import setup
-if sys.version_info >= (3,):
-    extra['use_2to3'] = True
 
 
 setup(name               = 'nsq-py',
@@ -29,7 +26,7 @@ setup(name               = 'nsq-py',
     install_requires=[
         'requests',
         'decorator',
-        'url',
+        'six',
         'statsd'
     ],
     tests_requires=[

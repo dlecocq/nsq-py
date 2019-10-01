@@ -17,12 +17,12 @@ def pack_iterable(messages):
     #      ... (repeated <num_messages> times)
     return pack_string(
         struct.pack('>l', len(messages)) +
-        ''.join(map(pack_string, messages)))
+        b''.join(map(pack_string, messages)))
 
 
 def pack(message):
     '''Pack the provided message'''
-    if isinstance(message, basestring):
+    if isinstance(message, bytes):
         return pack_string(message)
     else:
         return pack_iterable(message)
@@ -44,6 +44,6 @@ def distribute(total, objects):
     '''Generator for (count, object) tuples that distributes count evenly among
     the provided objects'''
     for index, obj in enumerate(objects):
-        start = (index * total) / len(objects)
-        stop = ((index + 1) * total) / len(objects)
+        start = (index * total) // len(objects)
+        stop = ((index + 1) * total) // len(objects)
         yield (stop - start, obj)

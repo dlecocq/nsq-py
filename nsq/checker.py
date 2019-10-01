@@ -48,7 +48,7 @@ class PeriodicThread(StoppableThread):
             try:
                 logger.info('Invoking callback %s', self.callback)
                 self.callback()
-            except StandardError:
+            except Exception:
                 logger.exception('Callback failed')
 
 

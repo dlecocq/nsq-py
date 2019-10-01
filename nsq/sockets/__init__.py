@@ -25,5 +25,5 @@ except ImportError:  # pragma: no cover
 try:
     from .tls import TLSSocket
 except ImportError:  # pragma: no cover
-    logger.warn('TLS not supported')
+    logger.warning('TLS not supported')
     TLSSocket = None

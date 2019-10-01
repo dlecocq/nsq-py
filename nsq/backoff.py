@@ -46,7 +46,7 @@ class Exponential(Backoff):
 
 class Clamped(Backoff):
     '''Backoff clamped to min / max bounds'''
-    def __init__(self, backoff, minimum=0, maximum=sys.maxint):
+    def __init__(self, backoff, minimum=0, maximum=sys.maxsize):
         Backoff.__init__(self)
         self._min = minimum
         self._max = maximum
