@@ -2,13 +2,14 @@ import logging
 
 # Logging, obviously
 logger = logging.getLogger('nsq')
-handler = logging.StreamHandler()
-handler.setLevel(logging.DEBUG)
-formatter = logging.Formatter(
-    '%(asctime)s [%(levelname)s] %(filename)s@%(lineno)d: %(message)s')
-handler.setFormatter(formatter)
-logger.addHandler(handler)
-logger.setLevel(logging.INFO)
+if not logger.handlers:
+    handler = logging.StreamHandler()
+    handler.setLevel(logging.DEBUG)
+    formatter = logging.Formatter(
+        '%(asctime)s [%(levelname)s] %(filename)s@%(lineno)d: %(message)s')
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+    logger.setLevel(logging.INFO)
 
 # Our underlying json implmentation
 try:
