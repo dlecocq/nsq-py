@@ -43,8 +43,8 @@ class Connection(object):
         self._timeout = timeout if timeout is not None else 1.0
         # The options to use when identifying
         self._identify_options = dict(identify)
-        self._identify_options.setdefault('short_id', socket.gethostname())
-        self._identify_options.setdefault('long_id', socket.getfqdn())
+        self._identify_options.setdefault('hostname', socket.gethostname())
+        self._identify_options.setdefault('client_id', socket.getfqdn().split('.')[0])
         self._identify_options.setdefault('feature_negotiation', True)
         self._identify_options.setdefault('user_agent', self.USER_AGENT)
 

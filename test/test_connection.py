@@ -340,8 +340,8 @@ class TestConnection(MockedSocketTest):
         '''Identify provides default options'''
         self.assertEqual(self.connection._identify_options, {
             'feature_negotiation': True,
-            'long_id': socket.getfqdn(),
-            'short_id': socket.gethostname(),
+            'client_id': socket.getfqdn().split('.')[0],
+            'hostname': socket.gethostname(),
             'user_agent': self.connection.USER_AGENT
         })
 
